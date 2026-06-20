@@ -1,13 +1,10 @@
 fileFormatVersion: 2
-guid: 4a4ff18937413d247ad912bcc2de0c55
+guid: 7dbeb58640d9a4d49afc5ff69447ea1e
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 2740655660744835783
-    second: anel_0
-  - first:
-      213: -8075353234458336716
-    second: anel_1
+      213: -8466779966103268678
+    second: lua_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -116,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: anel_0
+      name: lua_0
       rect:
         serializedVersion: 2
         x: 0
-        y: 0
-        width: 506
-        height: 487
+        y: 3
+        width: 468
+        height: 544
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -131,30 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 7c20c568dc3c80620800000000000000
-      internalID: 2740655660744835783
-      vertices: []
-      indices: 
-      edges: []
-      weights: []
-    - serializedVersion: 2
-      name: anel_1
-      rect:
-        serializedVersion: 2
-        x: 0
-        y: 478
-        width: 8
-        height: 9
-      alignment: 0
-      pivot: {x: 0, y: 0}
-      border: {x: 0, y: 0, z: 0, w: 0}
-      customData: 
-      outline: []
-      physicsShape: []
-      tessellationDetail: -1
-      bones: []
-      spriteID: 4322f40b4059eef80800000000000000
-      internalID: -8075353234458336716
+      spriteID: ab25501da74ff7a80800000000000000
+      internalID: -8466779966103268678
       vertices: []
       indices: 
       edges: []
@@ -173,8 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      anel_0: 2740655660744835783
-      anel_1: -8075353234458336716
+      lua_0: -8466779966103268678
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
