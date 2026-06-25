@@ -35,24 +35,33 @@ public class TimeInputFormatter : MonoBehaviour
         }
     }
 
-    void FormatFinalTime(string value)
+void FormatFinalTime(string value)
+{
+    if (string.IsNullOrEmpty(value))
+        return;
+
+    // Remove tudo que não for número
+    string digits = "";
+    foreach (char c in value)
     {
-        if (string.IsNullOrEmpty(value))
-            return;
-
-        string digits = value;
-
-        // Garante 4 dígitos
-        digits = digits.PadLeft(4, '0');
-
-        int hours = int.Parse(digits.Substring(0, 2));
-        int minutes = int.Parse(digits.Substring(2, 2));
-
-        hours = Mathf.Clamp(hours, 0, 23);
-        minutes = Mathf.Clamp(minutes, 0, 59);
-
-        input.text = $"{hours:00}:{minutes:00}";
+        if (char.IsDigit(c))
+            digits += c;
     }
+
+    if (digits.Length == 0)
+        return;
+
+    // Garante 4 dígitos
+    digits = digits.PadLeft(4, '0');
+
+    int hours = int.Parse(digits.Substring(0, 2));
+    int minutes = int.Parse(digits.Substring(2, 2));
+
+    hours = Mathf.Clamp(hours, 0, 23);
+    minutes = Mathf.Clamp(minutes, 0, 59);
+
+    input.text = $"{hours:00}:{minutes:00}";
+}
 
     public bool IsValidTime()
     {
