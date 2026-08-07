@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 79c0167d91fd2a246a75baffe0372178
+guid: b98c7479d04c98148a8c3e2c4021d669
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 8021985871563887879
-    second: Logo_TechTokki_0
+      213: -8492336567695241739
+    second: logo2_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -113,13 +113,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: Logo_TechTokki_0
+      name: logo2_0
       rect:
         serializedVersion: 2
-        x: 1
+        x: 0
         y: 0
-        width: 154
-        height: 154
+        width: 1448
+        height: 1448
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -128,8 +128,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 70594cbd5a1d35f60800000000000000
-      internalID: 8021985871563887879
+      spriteID: 5fd0771d2e8252a80800000000000000
+      internalID: -8492336567695241739
       vertices: []
       indices: 
       edges: []
@@ -148,7 +148,7 @@ TextureImporter:
     spriteCustomMetadata:
       entries: []
     nameFileIdTable:
-      Logo_TechTokki_0: 8021985871563887879
+      logo2_0: -8492336567695241739
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
