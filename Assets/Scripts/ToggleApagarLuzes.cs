@@ -6,7 +6,7 @@ public class ApagarAcenderToggle : MonoBehaviour
 {
     public Toggle toggle;
     public Image background;
-    public Text label;
+    public TextMeshProUGUI Texto;
 
     public Color apagarColor = Color.yellow;
     public Color acenderColor = Color.gray;
@@ -22,12 +22,12 @@ public class ApagarAcenderToggle : MonoBehaviour
         if (isOn)
         {
             background.color = apagarColor;
-            label.text = "Apagar todas";
+            Texto.text = "Apagar todas";
         }
         else
         {
             background.color = acenderColor;
-            label.text = "Acender todas";
+            Texto.text = "Acender todas";
         }
     }
 }

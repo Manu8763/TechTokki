@@ -8,7 +8,6 @@ public class SVPicker : MonoBehaviour,
     public ColorPicker picker;
 
     public RectTransform rectTransform;
-
     public RectTransform selector;
 
     public void OnPointerDown(PointerEventData eventData)
@@ -23,30 +22,39 @@ public class SVPicker : MonoBehaviour,
 
     void UpdatePicker(PointerEventData eventData)
     {
+        Vector2 localPoint;
+
         RectTransformUtility.ScreenPointToLocalPointInRectangle(
             rectTransform,
             eventData.position,
             eventData.pressEventCamera,
-            out Vector2 localPoint
+            out localPoint
         );
 
         Rect rect = rectTransform.rect;
 
-        float x = Mathf.Clamp01(
-            (localPoint.x - rect.x) / rect.width
-        );
+        // Limites considerando o tamanho do selector
+        float halfSelectorWidth = selector.rect.width * 0.5f;
+        float halfSelectorHeight = selector.rect.height * 0.5f;
 
-        float y = Mathf.Clamp01(
-            (localPoint.y - rect.y) / rect.height
-        );
+        float minX = rect.xMin + halfSelectorWidth;
+        float maxX = rect.xMax - halfSelectorWidth;
 
-        // Atualiza HSV
-        picker.PickColor(new Vector2(x, y));
+        float minY = rect.yMin + halfSelectorHeight;
+        float maxY = rect.yMax - halfSelectorHeight;
 
-        // Move bolinha
-        selector.anchoredPosition = new Vector2(
-            localPoint.x,
-            localPoint.y
-        );
+        // Limita o selector dentro do SVArea
+        float x = Mathf.Clamp(localPoint.x, minX, maxX);
+        float y = Mathf.Clamp(localPoint.y, minY, maxY);
+
+        // Move o selector
+        selector.localPosition = new Vector2(x, y);
+
+        // Converte para 0–1
+        float s = Mathf.InverseLerp(rect.xMin, rect.xMax, x);
+        float v = Mathf.InverseLerp(rect.yMin, rect.yMax, y);
+
+        // Atualiza a cor
+        picker.PickColor(new Vector2(s, v));
     }
 }
