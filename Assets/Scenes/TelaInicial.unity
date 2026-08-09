@@ -3449,7 +3449,7 @@ RectTransform:
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
   m_AnchorMin: {x: 0, y: 1}
   m_AnchorMax: {x: 0, y: 1}
-  m_AnchoredPosition: {x: 525.0269, y: -45.52}
+  m_AnchoredPosition: {x: 827.2228, y: -45.52}
   m_SizeDelta: {x: 800, y: 0}
   m_Pivot: {x: 0.5, y: 0.5}
 --- !u!114 &606496447
@@ -3813,6 +3813,7 @@ MonoBehaviour:
   toggle: {fileID: 714723752}
   background: {fileID: 1151456926}
   Texto: {fileID: 519491010}
+  esp32: {fileID: 342103773}
   apagarColor: {r: 1, g: 0.92156863, b: 0.015686275, a: 1}
   acenderColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
 --- !u!1 &723239766
