@@ -6,7 +6,7 @@ using System.Text;
 public class ESP32Controller : MonoBehaviour
 {
 
-    string ip = "10.122.109.20";
+    string ip = "10.22.134.200";
 
     int porta = 8080;
 
