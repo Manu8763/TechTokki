@@ -23,15 +23,15 @@ public class ApagarAcenderToggle : MonoBehaviour
     {
         if (isOn)
         {
-            background.color = apagarColor;
-            Texto.text = "Apagar todas";
+            background.color = acenderColor;
+            Texto.text = "Acender todas";
 
             esp32.LigarLED();
         }
         else
         {
-            background.color = acenderColor;
-            Texto.text = "Acender todas";
+            background.color = apagarColor;
+            Texto.text = "Apagar todas";
 
             esp32.DesligarLED();
         }

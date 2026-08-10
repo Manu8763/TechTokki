@@ -21,8 +21,10 @@ public class ControleTema : MonoBehaviour
 
     void Awake()
     {
-        if (Instance == null)
+        if (Instance == null){
             Instance = this;
+            ApplyTheme();
+        }
         else
             Destroy(gameObject);
     }
