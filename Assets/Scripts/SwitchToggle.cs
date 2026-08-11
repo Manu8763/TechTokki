@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using TMPro;
 
 public class SwitchToggle : MonoBehaviour
 {
@@ -15,6 +16,11 @@ public class SwitchToggle : MonoBehaviour
     public Color onColor = Color.yellow;
 
     public GameObject intensidadeECor;
+
+    public TextMeshProUGUI label;
+    public float onLabelX = -10f;
+    public float offLabelX = 10f;
+    
     void Start()
     {
         toggle.onValueChanged.AddListener(UpdateSwitch);
@@ -41,6 +47,16 @@ public class SwitchToggle : MonoBehaviour
         if (intensidadeECor != null)
         {
             intensidadeECor.SetActive(isOn);
+        }
+        
+        if (label != null)
+        {
+            label.text = isOn ? "ON" : "OFF";
+
+            label.rectTransform.anchoredPosition = new Vector2(
+                isOn ? onLabelX : offLabelX,
+                label.rectTransform.anchoredPosition.y
+            );
         }
     }
 }
