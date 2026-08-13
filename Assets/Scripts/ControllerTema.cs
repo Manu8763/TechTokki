@@ -12,11 +12,15 @@ public class ControleTema : MonoBehaviour
     public Color backgroundDark;
     public Color backgroundLight;
 
+    public Color headerDark;
+    public Color headerLight;
+
     public Color textDark;
     public Color textLight;
 
     [Header("Referências")]
     public Image[] backgrounds;
+    public Image headerBackground;
     public TextMeshProUGUI[] texts;
 
     void Awake()
@@ -49,6 +53,11 @@ public class ControleTema : MonoBehaviour
         {
             if (bg != null)
                 bg.color = darkMode ? backgroundDark : backgroundLight;
+        }
+
+        if (headerBackground != null)
+        {
+            headerBackground.color = darkMode ? headerDark : headerLight;
         }
     }
 }
