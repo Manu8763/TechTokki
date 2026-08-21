@@ -27,7 +27,7 @@ public class SwitchToggle : MonoBehaviour
         UpdateSwitch(toggle.isOn);
     }
 
-    void UpdateSwitch(bool isOn)
+    public void UpdateSwitch(bool isOn)
     {
         if (handle != null)
         {
