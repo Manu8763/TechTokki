@@ -1,127 +1,174 @@
 using UnityEngine;
-using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 
 public class ESP32Controller : MonoBehaviour
 {
-    private string ip = "";
+    // ==========================
+    // CONFIGURAÇÃO
+    // ==========================
 
-    private int porta = 8080;
+    private const string enderecoESP32 = "esp32.local";
+    private const int porta = 8080;
 
-    private const int discoveryPort = 4210;
+    // ==========================
+    // CONEXÃO
+    // ==========================
 
-    private UdpClient udp;
+    private TcpClient cliente;
+    private NetworkStream stream;
 
+    private CancellationTokenSource cancelamento;
+
+    private bool conectado = false;
+    private bool conectando = false;
+
+
+    // ==========================
+    // START
+    // ==========================
 
     async void Start()
     {
-        await ProcurarESP32();
+        cancelamento = new CancellationTokenSource();
+
+        Debug.Log("ESP32 Controller iniciado.");
+
+        await ConectarContinuamente(
+            cancelamento.Token
+        );
     }
 
 
-    async Task ProcurarESP32()
+    // ==========================
+    // CONEXÃO PERMANENTE
+    // ==========================
+
+    async Task ConectarContinuamente(
+        CancellationToken token
+    )
     {
-        Debug.Log("Procurando ESP32...");
+        while (!token.IsCancellationRequested)
+        {
+            if (!conectado && !conectando)
+            {
+                await Conectar();
+            }
+
+            await Task.Delay(1000);
+        }
+    }
+
+
+    // ==========================
+    // CONECTAR
+    // ==========================
+
+    async Task Conectar()
+    {
+        if (conectando)
+            return;
+
+        conectando = true;
+
+        Debug.Log(
+            "Conectando ao ESP32 em " +
+            enderecoESP32 +
+            ":" +
+            porta
+        );
+
 
         try
         {
-            udp = new UdpClient();
-
-            udp.EnableBroadcast = true;
-
-            byte[] mensagem =
-                Encoding.UTF8.GetBytes("ESP32_DISCOVERY");
+            TcpClient novoCliente =
+                new TcpClient();
 
 
-            IPEndPoint destino =
-                new IPEndPoint(
-                    IPAddress.Broadcast,
-                    discoveryPort
+            // Tenta conectar
+            Task conexao =
+                novoCliente.ConnectAsync(
+                    enderecoESP32,
+                    porta
                 );
 
 
-            udp.Send(
-                mensagem,
-                mensagem.Length,
-                destino
-            );
-
-
-            Task<UdpReceiveResult> recebimento =
-                udp.ReceiveAsync();
-
-
+            // Timeout de 3 segundos
             if (await Task.WhenAny(
-                recebimento,
+                conexao,
                 Task.Delay(3000)
-            ) != recebimento)
+            ) != conexao)
             {
-                Debug.LogError(
-                    "Nenhum ESP32 encontrado."
+                novoCliente.Close();
+
+                Debug.LogWarning(
+                    "Tempo esgotado ao conectar."
                 );
 
-                udp.Close();
+                conectando = false;
 
                 return;
             }
 
 
-            UdpReceiveResult resultado =
-                await recebimento;
-
-
-            string resposta =
-                Encoding.UTF8.GetString(
-                    resultado.Buffer
-                );
-
-
-            Debug.Log(
-                "Resposta do ESP32: " +
-                resposta
-            );
-
-
-            string[] partes =
-                resposta.Split('|');
-
-
-            if (partes.Length >= 3 &&
-                partes[0] == "ESP32")
+            // Verifica conexão
+            if (!novoCliente.Connected)
             {
-                ip = partes[1];
+                novoCliente.Close();
 
-                porta =
-                    int.Parse(partes[2]);
-
-
-                Debug.Log(
-                    "ESP32 encontrado!"
+                Debug.LogWarning(
+                    "Não foi possível conectar."
                 );
 
-                Debug.Log(
-                    "IP: " + ip
-                );
+                conectando = false;
 
-                Debug.Log(
-                    "Porta: " + porta
-                );
+                return;
             }
 
 
-            udp.Close();
+            // Guarda conexão
+            cliente = novoCliente;
+
+            stream = cliente.GetStream();
+
+            conectado = true;
+
+            Debug.Log(
+                "================================="
+            );
+
+            Debug.Log(
+                "ESP32 CONECTADO!"
+            );
+
+            Debug.Log(
+                "Conexão permanente estabelecida."
+            );
+
+            Debug.Log(
+                "================================="
+            );
         }
         catch (System.Exception erro)
         {
-            Debug.LogError(
-                "Erro na descoberta: " +
+            Debug.LogWarning(
+                "Erro ao conectar: " +
                 erro.Message
             );
+
+            Desconectar();
         }
+
+
+        conectando = false;
     }
 
+
+    // ==========================
+    // LIGAR LED
+    // ==========================
 
     public void LigarLED()
     {
@@ -129,18 +176,31 @@ public class ESP32Controller : MonoBehaviour
     }
 
 
+    // ==========================
+    // DESLIGAR LED
+    // ==========================
+
     public void DesligarLED()
     {
         EnviarComando("LED_OFF");
     }
 
 
-    async void EnviarComando(string comando)
+    // ==========================
+    // ENVIAR COMANDO
+    // ==========================
+
+    async void EnviarComando(
+        string comando
+    )
     {
-        if (string.IsNullOrEmpty(ip))
+        if (!conectado ||
+            cliente == null ||
+            !cliente.Connected ||
+            stream == null)
         {
-            Debug.LogError(
-                "ESP32 ainda não foi encontrado!"
+            Debug.LogWarning(
+                "ESP32 não está conectado."
             );
 
             return;
@@ -149,68 +209,91 @@ public class ESP32Controller : MonoBehaviour
 
         try
         {
-            using (TcpClient cliente =
-                new TcpClient())
-            {
-
-                Task conexao =
-                    cliente.ConnectAsync(
-                        ip,
-                        porta
-                    );
-
-
-                if (await Task.WhenAny(
-                    conexao,
-                    Task.Delay(2000)
-                ) != conexao)
-                {
-                    Debug.LogError(
-                        "Não foi possível conectar ao ESP32."
-                    );
-
-                    return;
-                }
-
-
-                NetworkStream stream =
-                    cliente.GetStream();
-
-
-                byte[] dados =
-                    Encoding.UTF8.GetBytes(
-                        comando + "\n"
-                    );
-
-
-                await stream.WriteAsync(
-                    dados,
-                    0,
-                    dados.Length
+            byte[] dados =
+                Encoding.UTF8.GetBytes(
+                    comando + "\n"
                 );
 
 
-                Debug.Log(
-                    "Comando enviado: " +
-                    comando
-                );
-            }
+            await stream.WriteAsync(
+                dados,
+                0,
+                dados.Length
+            );
+
+
+            Debug.Log(
+                "Comando enviado: " +
+                comando
+            );
         }
         catch (System.Exception erro)
         {
-            Debug.LogError(
+            Debug.LogWarning(
                 "Erro ao enviar comando: " +
                 erro.Message
             );
+
+            Desconectar();
         }
     }
 
 
-    private void OnDestroy()
+    // ==========================
+    // DESCONECTAR
+    // ==========================
+
+    void Desconectar()
     {
-        if (udp != null)
+        conectado = false;
+
+
+        if (stream != null)
         {
-            udp.Close();
+            try
+            {
+                stream.Close();
+            }
+            catch
+            {
+            }
+
+            stream = null;
         }
+
+
+        if (cliente != null)
+        {
+            try
+            {
+                cliente.Close();
+            }
+            catch
+            {
+            }
+
+            cliente = null;
+        }
+
+
+        Debug.Log(
+            "Conexão com ESP32 encerrada."
+        );
+    }
+
+
+    // ==========================
+    // DESTROY
+    // ==========================
+
+    void OnDestroy()
+    {
+        if (cancelamento != null)
+        {
+            cancelamento.Cancel();
+            cancelamento.Dispose();
+        }
+
+        Desconectar();
     }
 }
