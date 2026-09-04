@@ -30,6 +30,7 @@ public class ESP32Controller : MonoBehaviour
     // =========================
 
     private bool corAtiva = false;
+    private Color ultimaCor = Color.white;
 
     // =========================
     // START
@@ -161,14 +162,20 @@ public class ESP32Controller : MonoBehaviour
     // TOGGLE DE COR
     // =========================
 
-public void AlternarCor(bool ativo)
+    public void AlternarCor(bool ativo)
 {
     corAtiva = ativo;
 
-    Debug.Log("Toggle: " + ativo);
+    Debug.Log("Controle de cor: " + ativo);
 
-    if (!corAtiva)
+    if (corAtiva)
     {
+        // Voltou a ativar → recupera a última cor
+        EnviarCor(ultimaCor);
+    }
+    else
+    {
+        // Desativou → deixa branco
         EnviarComando("RGB:255,255,255");
     }
 }
@@ -187,6 +194,8 @@ public void AlternarCor(bool ativo)
         return;
     }
 
+    ultimaCor = cor;
+
     int r = Mathf.RoundToInt(cor.r * 255);
     int g = Mathf.RoundToInt(cor.g * 255);
     int b = Mathf.RoundToInt(cor.b * 255);
@@ -197,22 +206,27 @@ public void AlternarCor(bool ativo)
 }
 
     // =========================
-    // LIGAR LED
+    // LIGAR/DESLIGAR LED
     // =========================
 
     public void LigarLED()
+{
+    if (corAtiva)
     {
+        // Liga diretamente na última cor escolhida
+        EnviarCor(ultimaCor);
+    }
+    else
+    {
+        // Sem controle de cor → liga em branco
         EnviarComando("LED_ON");
     }
+}
 
-    // =========================
-    // DESLIGAR LED
-    // =========================
-
-    public void DesligarLED()
-    {
-        EnviarComando("LED_OFF");
-    }
+public void DesligarLED()
+{
+    EnviarComando("LED_OFF");
+}
 
     // =========================
     // ENVIAR COMANDO
