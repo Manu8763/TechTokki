@@ -4,7 +4,6 @@ using TMPro;
 
 public class SwitchToggle : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     public Toggle toggle;
     public RectTransform handle;
 
@@ -20,7 +19,10 @@ public class SwitchToggle : MonoBehaviour
     public TextMeshProUGUI label;
     public float onLabelX = -10f;
     public float offLabelX = 10f;
-    
+
+    // ADICIONE ISSO
+    public ESP32Controller esp32Controller;
+
     void Start()
     {
         toggle.onValueChanged.AddListener(UpdateSwitch);
@@ -37,18 +39,16 @@ public class SwitchToggle : MonoBehaviour
             );
         }
 
-        // Muda cor do fundo
         if (background != null)
         {
             background.color = isOn ? onColor : offColor;
         }
 
-        // MOSTRA / OCULTA só se existir
         if (intensidadeECor != null)
         {
             intensidadeECor.SetActive(isOn);
         }
-        
+
         if (label != null)
         {
             label.text = isOn ? "ON" : "OFF";
@@ -57,6 +57,12 @@ public class SwitchToggle : MonoBehaviour
                 isOn ? onLabelX : offLabelX,
                 label.rectTransform.anchoredPosition.y
             );
+        }
+
+        // AVISA O ESP32 CONTROLLER SE O CONTROLE DE COR ESTÁ ATIVO
+        if (esp32Controller != null)
+        {
+            esp32Controller.AlternarCor(isOn);
         }
     }
 }

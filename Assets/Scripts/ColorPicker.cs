@@ -22,8 +22,22 @@ public class ColorPicker : MonoBehaviour
     [Header("Selector")]
     public RectTransform selector;
 
+    // =========================
+    // ESP32
+    // =========================
+
+    public ESP32Controller esp32Controller;
+
+    // =========================
+    // VARIÁVEIS
+    // =========================
+
     private Texture2D svTexture;
     private Color currentColor;
+
+    // =========================
+    // START
+    // =========================
 
     void Start()
     {
@@ -39,7 +53,14 @@ public class ColorPicker : MonoBehaviour
         GenerateSVTexture();
 
         // Cor inicial
-        SetColor(Color.HSVToRGB(hue, saturation, value), false);
+        SetColor(
+            Color.HSVToRGB(
+                hue,
+                saturation,
+                value
+            ),
+            false
+        );
     }
 
     // =========================
@@ -94,11 +115,26 @@ public class ColorPicker : MonoBehaviour
     {
         currentColor = color;
 
-        // Preview
+        // =========================
+        // ENVIAR PARA O ESP32
+        // =========================
+
+        if (salvarNoComodo && esp32Controller != null)
+        {
+            esp32Controller.EnviarCor(color);
+        }
+
+        // =========================
+        // PREVIEW
+        // =========================
+
         if (preview != null)
             preview.color = color;
 
-        // Atualiza Inputs RGB
+        // =========================
+        // ATUALIZA INPUTS RGB
+        // =========================
+
         if (rInput != null)
             rInput.SetTextWithoutNotify(
                 Mathf.RoundToInt(color.r * 255).ToString()
@@ -114,8 +150,12 @@ public class ColorPicker : MonoBehaviour
                 Mathf.RoundToInt(color.b * 255).ToString()
             );
 
-        // Só salva quando a mudança veio do usuário
-        if (salvarNoComodo && GerenciadorComodos.Instance != null)
+        // =========================
+        // SALVAR COR
+        // =========================
+
+        if (salvarNoComodo &&
+            GerenciadorComodos.Instance != null)
         {
             GerenciadorComodos.Instance.SalvarCor(color);
         }
@@ -137,11 +177,17 @@ public class ColorPicker : MonoBehaviour
             b / 255f
         );
 
-        // Atualiza Preview
+        // =========================
+        // ATUALIZA PREVIEW
+        // =========================
+
         if (preview != null)
             preview.color = currentColor;
 
-        // Atualiza HSV
+        // =========================
+        // ATUALIZA HSV
+        // =========================
+
         Color.RGBToHSV(
             currentColor,
             out hue,
@@ -149,13 +195,31 @@ public class ColorPicker : MonoBehaviour
             out value
         );
 
-        // Atualiza slider
+        // =========================
+        // ATUALIZA SLIDER
+        // =========================
+
         hueSlider.SetValueWithoutNotify(hue);
 
-        // Atualiza textura
+        // =========================
+        // ATUALIZA TEXTURA
+        // =========================
+
         GenerateSVTexture();
 
-        // Salva no cômodo atual
+        // =========================
+        // ENVIA PARA ESP32
+        // =========================
+
+        if (esp32Controller != null)
+        {
+            esp32Controller.EnviarCor(currentColor);
+        }
+
+        // =========================
+        // SALVA NO CÔMODO
+        // =========================
+
         if (GerenciadorComodos.Instance != null)
         {
             GerenciadorComodos.Instance.SalvarCor(currentColor);
@@ -214,7 +278,10 @@ public class ColorPicker : MonoBehaviour
 
         if (svTexture == null)
         {
-            svTexture = new Texture2D(width, height);
+            svTexture = new Texture2D(
+                width,
+                height
+            );
         }
 
         for (int y = 0; y < height; y++)
@@ -230,11 +297,16 @@ public class ColorPicker : MonoBehaviour
                     v
                 );
 
-                svTexture.SetPixel(x, y, color);
+                svTexture.SetPixel(
+                    x,
+                    y,
+                    color
+                );
             }
         }
 
         svTexture.Apply();
+
         svImage.texture = svTexture;
     }
 }
