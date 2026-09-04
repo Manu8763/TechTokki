@@ -24,6 +24,7 @@ public class ESP32Controller : MonoBehaviour
 
     private bool conectado = false;
     private bool conectando = false;
+    private bool corAtiva = false;
 
 
     // ==========================
@@ -185,6 +186,35 @@ public class ESP32Controller : MonoBehaviour
         EnviarComando("LED_OFF");
     }
 
+    // ==========================
+    // CONTROLE DE LUZ
+    // ==========================
+
+    public void AtivarCor()
+{
+    corAtiva = true;
+
+    Debug.Log("Controle de cor ATIVADO");
+}
+
+public void DesativarCor()
+{
+    corAtiva = false;
+
+    Debug.Log("Controle de cor DESATIVADO");
+}
+
+public void AlternarCor()
+{
+    if (corAtiva)
+    {
+        DesativarCor();
+    }
+    else
+    {
+        AtivarCor();
+    }
+}
 
     // ==========================
     // ENVIAR COMANDO
