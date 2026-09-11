@@ -34,6 +34,7 @@ public class ColorPicker : MonoBehaviour
 
     private Texture2D svTexture;
     private Color currentColor;
+    private float intensidade = 1f;
 
     // =========================
     // START
@@ -121,7 +122,7 @@ public class ColorPicker : MonoBehaviour
 
         if (salvarNoComodo && esp32Controller != null)
         {
-            esp32Controller.EnviarCor(color);
+            AplicarCorComIntensidade();
         }
 
         // =========================
@@ -213,7 +214,7 @@ public class ColorPicker : MonoBehaviour
 
         if (esp32Controller != null)
         {
-            esp32Controller.EnviarCor(currentColor);
+            AplicarCorComIntensidade();
         }
 
         // =========================
@@ -308,5 +309,26 @@ public class ColorPicker : MonoBehaviour
         svTexture.Apply();
 
         svImage.texture = svTexture;
+    }
+
+    public void SetIntensidade(float valor)
+    {
+        intensidade = Mathf.Clamp01(valor);
+
+        AplicarCorComIntensidade();
+    }
+
+    void AplicarCorComIntensidade()
+    {
+        if (esp32Controller == null)
+            return;
+
+        Color corFinal = new Color(
+            currentColor.r * intensidade,
+            currentColor.g * intensidade,
+            currentColor.b * intensidade
+        );
+
+        esp32Controller.EnviarCor(corFinal);
     }
 }

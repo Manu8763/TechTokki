@@ -4,16 +4,34 @@ using TMPro;
 
 public class SliderScript : MonoBehaviour
 {
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
     [SerializeField] private Slider _slider;
     [SerializeField] private TextMeshProUGUI _sliderText;
+
+    [Header("Color Picker")]
+    public ColorPicker colorPicker;
+
     void Start()
     {
-       UpdateSliderText(_slider.value);
+        if (_slider.value <= 0)
+            _slider.value = 100;
+
+        _slider.onValueChanged.AddListener(UpdateSliderText);
+
+        UpdateSliderText(_slider.value);
     }
 
     public void UpdateSliderText(float value)
     {
-        _sliderText.text = value.ToString() + "%";
+        _sliderText.text = Mathf.RoundToInt(value) + "%";
+
+        AplicarIntensidade(value);
+    }
+
+    void AplicarIntensidade(float intensidade)
+    {
+        if (colorPicker != null)
+        {
+            colorPicker.SetIntensidade(intensidade / 100f);
+        }
     }
 }
