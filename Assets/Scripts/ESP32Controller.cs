@@ -2,7 +2,6 @@ using UnityEngine;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
-using System.Net.Sockets;
 using System.Text;
 using System.Threading.Tasks;
 using System.Collections.Generic;
@@ -32,7 +31,15 @@ public class ESP32Controller : MonoBehaviour
     // =====================================================
 
     private bool corAtiva = false;
+
+    // Cor escolhida pelo usuário
+    // SEM intensidade
     private Color ultimaCor = Color.white;
+
+    // Intensidade escolhida pelo usuário
+    // 1 = 100%
+    // 0.5 = 50%
+    private float intensidadeAtual = 1f;
 
     // =====================================================
     // START
@@ -48,7 +55,7 @@ public class ESP32Controller : MonoBehaviour
     }
 
     // =====================================================
-    // TENTAR CONECTAR CONTINUAMENTE
+    // CONECTAR CONTINUAMENTE
     // =====================================================
 
     async Task ConectarContinuamente()
@@ -74,7 +81,8 @@ public class ESP32Controller : MonoBehaviour
         Debug.Log("PROCURANDO ESP32...");
         Debug.Log("=================================");
 
-        List<string> enderecos = ObterEnderecosDaRede();
+        List<string> enderecos =
+            ObterEnderecosDaRede();
 
         if (enderecos.Count == 0)
         {
@@ -90,7 +98,6 @@ public class ESP32Controller : MonoBehaviour
             enderecos.Count
         );
 
-        // Testa vários IPs simultaneamente
         List<Task<string>> tarefas =
             new List<Task<string>>();
 
@@ -106,28 +113,15 @@ public class ESP32Controller : MonoBehaviour
 
             tarefas.Remove(tarefa);
 
-            string resultado = await tarefa;
+            string resultado =
+                await tarefa;
 
             if (!string.IsNullOrEmpty(resultado))
             {
-                // Cancela conceitualmente o restante
-                // simplesmente ignorando os resultados.
-
-                Debug.Log(
-                    "================================="
-                );
-
-                Debug.Log(
-                    "ESP32 ENCONTRADO!"
-                );
-
-                Debug.Log(
-                    "IP: " + resultado
-                );
-
-                Debug.Log(
-                    "================================="
-                );
+                Debug.Log("=================================");
+                Debug.Log("ESP32 ENCONTRADO!");
+                Debug.Log("IP: " + resultado);
+                Debug.Log("=================================");
 
                 return resultado;
             }
@@ -141,7 +135,7 @@ public class ESP32Controller : MonoBehaviour
     }
 
     // =====================================================
-    // OBTER IPS DA REDE LOCAL
+    // OBTER IPS DA REDE
     // =====================================================
 
     List<string> ObterEnderecosDaRede()
@@ -223,11 +217,9 @@ public class ESP32Controller : MonoBehaviour
                     primeiro |
                     (~mascaraInt);
 
-                // Evitar testar a rede e broadcast
                 int inicio = primeiro + 1;
                 int fim = broadcast - 1;
 
-                // Segurança: não varrer redes gigantes
                 if (fim - inicio > 1024)
                 {
                     Debug.LogWarning(
@@ -263,7 +255,7 @@ public class ESP32Controller : MonoBehaviour
     }
 
     // =====================================================
-    // CONVERTER IP → INT
+    // IP → INT
     // =====================================================
 
     int EnderecoParaInt(byte[] bytes)
@@ -276,7 +268,7 @@ public class ESP32Controller : MonoBehaviour
     }
 
     // =====================================================
-    // CONVERTER INT → IP
+    // INT → IP
     // =====================================================
 
     string IntParaEndereco(int valor)
@@ -297,7 +289,7 @@ public class ESP32Controller : MonoBehaviour
     }
 
     // =====================================================
-    // TESTAR UM IP
+    // TESTAR IP
     // =====================================================
 
     async Task<string> TestarIP(string ip)
@@ -319,8 +311,10 @@ public class ESP32Controller : MonoBehaviour
                     Task.Delay(500)
                 );
 
-            if (terminado == conexao &&
-                teste.Connected)
+            if (
+                terminado == conexao &&
+                teste.Connected
+            )
             {
                 teste.Close();
 
@@ -336,7 +330,6 @@ public class ESP32Controller : MonoBehaviour
         }
         catch
         {
-            // IP não possui ESP32.
         }
 
         return null;
@@ -444,30 +437,14 @@ public class ESP32Controller : MonoBehaviour
                 return;
             }
 
-            cliente =
-                novoCliente;
-
-            stream =
-                cliente.GetStream();
-
+            cliente = novoCliente;
+            stream = cliente.GetStream();
             conectado = true;
 
-            Debug.Log(
-                "================================="
-            );
-
-            Debug.Log(
-                "ESP32 CONECTADO COM SUCESSO!"
-            );
-
-            Debug.Log(
-                "IP: " +
-                enderecoESP32
-            );
-
-            Debug.Log(
-                "================================="
-            );
+            Debug.Log("=================================");
+            Debug.Log("ESP32 CONECTADO COM SUCESSO!");
+            Debug.Log("IP: " + enderecoESP32);
+            Debug.Log("=================================");
         }
         catch (
             System.Exception erro
@@ -480,6 +457,43 @@ public class ESP32Controller : MonoBehaviour
 
             Desconectar();
         }
+    }
+
+    // =====================================================
+    // PROGRAMAÇÃO
+    // =====================================================
+
+    public void ProgramarLuzes(
+        string horarioLigar,
+        string horarioDesligar
+    )
+    {
+        string comando =
+            $"PROGRAMAR:{horarioLigar},{horarioDesligar}";
+
+        Debug.Log(
+            "Programando luzes: " +
+            horarioLigar +
+            " -> " +
+            horarioDesligar
+        );
+
+        EnviarComando(comando);
+    }
+
+    // =====================================================
+    // CANCELAR PROGRAMAÇÃO
+    // =====================================================
+
+    public void CancelarProgramacao()
+    {
+        Debug.Log(
+            "Cancelando programação..."
+        );
+
+        EnviarComando(
+            "CANCELAR_PROGRAMACAO"
+        );
     }
 
     // =====================================================
@@ -497,10 +511,13 @@ public class ESP32Controller : MonoBehaviour
 
         if (corAtiva)
         {
-            EnviarCor(ultimaCor);
+            // Liga o controle de cor
+            // respeitando a intensidade atual
+            EnviarCorComIntensidade();
         }
         else
         {
+            // Desativa o controle de cor
             EnviarComando(
                 "RGB:255,255,255"
             );
@@ -508,7 +525,7 @@ public class ESP32Controller : MonoBehaviour
     }
 
     // =====================================================
-    // ENVIAR COR
+    // RECEBER COR DO COLOR PICKER
     // =====================================================
 
     public void EnviarCor(Color cor)
@@ -522,16 +539,83 @@ public class ESP32Controller : MonoBehaviour
             return;
         }
 
+        // Guarda a cor original
         ultimaCor = cor;
 
+        Debug.Log(
+            "Nova cor escolhida: " +
+            Mathf.RoundToInt(cor.r * 255) +
+            "," +
+            Mathf.RoundToInt(cor.g * 255) +
+            "," +
+            Mathf.RoundToInt(cor.b * 255)
+        );
+
+        EnviarCorComIntensidade();
+    }
+
+    // =====================================================
+    // RECEBER INTENSIDADE
+    // =====================================================
+
+    public void DefinirIntensidade(float intensidade)
+    {
+        intensidadeAtual =
+            Mathf.Clamp01(intensidade);
+
+        Debug.Log(
+            "Nova intensidade: " +
+            Mathf.RoundToInt(
+                intensidadeAtual * 100
+            ) +
+            "%"
+        );
+
+        // Só envia se o controle de cor
+        // estiver ativo
+        if (corAtiva)
+        {
+            EnviarCorComIntensidade();
+        }
+    }
+
+    // =====================================================
+    // CALCULAR E ENVIAR COR + INTENSIDADE
+    // =====================================================
+
+    void EnviarCorComIntensidade()
+    {
+        if (!corAtiva)
+        {
+            Debug.Log(
+                "COR NÃO ENVIADA: Toggle está DESATIVADO."
+            );
+
+            return;
+        }
+
+        // Aplica intensidade à cor original
+        Color corFinal =
+            new Color(
+                ultimaCor.r * intensidadeAtual,
+                ultimaCor.g * intensidadeAtual,
+                ultimaCor.b * intensidadeAtual
+            );
+
         int r =
-            Mathf.RoundToInt(cor.r * 255);
+            Mathf.RoundToInt(
+                corFinal.r * 255
+            );
 
         int g =
-            Mathf.RoundToInt(cor.g * 255);
+            Mathf.RoundToInt(
+                corFinal.g * 255
+            );
 
         int b =
-            Mathf.RoundToInt(cor.b * 255);
+            Mathf.RoundToInt(
+                corFinal.b * 255
+            );
 
         Debug.Log(
             $"ENVIANDO RGB: {r},{g},{b}"
@@ -548,15 +632,14 @@ public class ESP32Controller : MonoBehaviour
 
     public void LigarLED()
     {
-    // Primeiro liga fisicamente a lâmpada.
-    EnviarComando("LED_ON");
+        // Liga fisicamente
+        EnviarComando("LED_ON");
 
-    // Se o controle de cor estiver ativo,
-    // restaura a última cor escolhida.
-    if (corAtiva)
-    {
-        EnviarCor(ultimaCor);
-    }
+        // Depois restaura a cor e intensidade
+        if (corAtiva)
+        {
+            EnviarCorComIntensidade();
+        }
     }
 
     // =====================================================

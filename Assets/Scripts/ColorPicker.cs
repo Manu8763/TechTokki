@@ -33,7 +33,12 @@ public class ColorPicker : MonoBehaviour
     // =========================
 
     private Texture2D svTexture;
+
+    // Cor escolhida pelo usuário
+    // SEM considerar intensidade
     private Color currentColor;
+
+    // Intensidade atual
     private float intensidade = 1f;
 
     // =========================
@@ -46,9 +51,20 @@ public class ColorPicker : MonoBehaviour
         hueSlider.onValueChanged.AddListener(OnHueChanged);
 
         // Inputs RGB
-        rInput.onEndEdit.AddListener(delegate { UpdateFromRGB(); });
-        gInput.onEndEdit.AddListener(delegate { UpdateFromRGB(); });
-        bInput.onEndEdit.AddListener(delegate { UpdateFromRGB(); });
+        rInput.onEndEdit.AddListener(delegate
+        {
+            UpdateFromRGB();
+        });
+
+        gInput.onEndEdit.AddListener(delegate
+        {
+            UpdateFromRGB();
+        });
+
+        bInput.onEndEdit.AddListener(delegate
+        {
+            UpdateFromRGB();
+        });
 
         // Gera textura inicial
         GenerateSVTexture();
@@ -114,15 +130,16 @@ public class ColorPicker : MonoBehaviour
 
     public void SetColor(Color color, bool salvarNoComodo)
     {
+        // Guarda a cor ORIGINAL
         currentColor = color;
 
         // =========================
-        // ENVIAR PARA O ESP32
+        // ENVIA PARA O ESP32
         // =========================
 
         if (salvarNoComodo && esp32Controller != null)
         {
-            AplicarCorComIntensidade();
+            esp32Controller.EnviarCor(currentColor);
         }
 
         // =========================
@@ -137,26 +154,34 @@ public class ColorPicker : MonoBehaviour
         // =========================
 
         if (rInput != null)
+        {
             rInput.SetTextWithoutNotify(
                 Mathf.RoundToInt(color.r * 255).ToString()
             );
+        }
 
         if (gInput != null)
+        {
             gInput.SetTextWithoutNotify(
                 Mathf.RoundToInt(color.g * 255).ToString()
             );
+        }
 
         if (bInput != null)
+        {
             bInput.SetTextWithoutNotify(
                 Mathf.RoundToInt(color.b * 255).ToString()
             );
+        }
 
         // =========================
         // SALVAR COR
         // =========================
 
-        if (salvarNoComodo &&
-            GerenciadorComodos.Instance != null)
+        if (
+            salvarNoComodo &&
+            GerenciadorComodos.Instance != null
+        )
         {
             GerenciadorComodos.Instance.SalvarCor(color);
         }
@@ -179,7 +204,7 @@ public class ColorPicker : MonoBehaviour
         );
 
         // =========================
-        // ATUALIZA PREVIEW
+        // PREVIEW
         // =========================
 
         if (preview != null)
@@ -214,7 +239,7 @@ public class ColorPicker : MonoBehaviour
 
         if (esp32Controller != null)
         {
-            AplicarCorComIntensidade();
+            esp32Controller.EnviarCor(currentColor);
         }
 
         // =========================
@@ -233,7 +258,6 @@ public class ColorPicker : MonoBehaviour
 
     public void CarregarCor(Color color)
     {
-        // Converte a cor para HSV
         Color.RGBToHSV(
             color,
             out hue,
@@ -241,26 +265,43 @@ public class ColorPicker : MonoBehaviour
             out value
         );
 
-        // Atualiza Hue
         if (hueSlider != null)
             hueSlider.SetValueWithoutNotify(hue);
 
-        // Atualiza textura SV
         GenerateSVTexture();
 
-        // Atualiza preview e RGB
         SetColor(color, false);
+    }
+
+    // =========================
+    // INTENSIDADE
+    // =========================
+
+    public void SetIntensidade(float valor)
+    {
+        intensidade = Mathf.Clamp01(valor);
+
+        Debug.Log(
+            "Intensidade selecionada: " +
+            Mathf.RoundToInt(intensidade * 100) +
+            "%"
+        );
+
+        if (esp32Controller != null)
+        {
+            esp32Controller.DefinirIntensidade(intensidade);
+        }
     }
 
     // =========================
     // INPUT LIMIT
     // =========================
 
-    int ClampInput(string value)
+    int ClampInput(string valor)
     {
         int number;
 
-        if (!int.TryParse(value, out number))
+        if (!int.TryParse(valor, out number))
         {
             number = 0;
         }
@@ -309,26 +350,5 @@ public class ColorPicker : MonoBehaviour
         svTexture.Apply();
 
         svImage.texture = svTexture;
-    }
-
-    public void SetIntensidade(float valor)
-    {
-        intensidade = Mathf.Clamp01(valor);
-
-        AplicarCorComIntensidade();
-    }
-
-    void AplicarCorComIntensidade()
-    {
-        if (esp32Controller == null)
-            return;
-
-        Color corFinal = new Color(
-            currentColor.r * intensidade,
-            currentColor.g * intensidade,
-            currentColor.b * intensidade
-        );
-
-        esp32Controller.EnviarCor(corFinal);
     }
 }

@@ -24,14 +24,9 @@ public class SliderScript : MonoBehaviour
     {
         _sliderText.text = Mathf.RoundToInt(value) + "%";
 
-        AplicarIntensidade(value);
-    }
-
-    void AplicarIntensidade(float intensidade)
-    {
         if (colorPicker != null)
         {
-            colorPicker.SetIntensidade(intensidade / 100f);
+            colorPicker.SetIntensidade(value / 100f);
         }
     }
 }
