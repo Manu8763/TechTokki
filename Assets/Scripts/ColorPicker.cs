@@ -22,16 +22,10 @@ public class ColorPicker : MonoBehaviour
     [Header("Selector")]
     public RectTransform selector;
 
-    // =========================
     // ESP32
-    // =========================
-
     public ESP32Controller esp32Controller;
 
-    // =========================
     // VARIÁVEIS
-    // =========================
-
     private Texture2D svTexture;
 
     // Cor escolhida pelo usuário
@@ -41,10 +35,7 @@ public class ColorPicker : MonoBehaviour
     // Intensidade atual
     private float intensidade = 1f;
 
-    // =========================
     // START
-    // =========================
-
     void Start()
     {
         // Slider do Hue
@@ -80,10 +71,7 @@ public class ColorPicker : MonoBehaviour
         );
     }
 
-    // =========================
     // HUE
-    // =========================
-
     void OnHueChanged(float h)
     {
         hue = h;
@@ -92,10 +80,7 @@ public class ColorPicker : MonoBehaviour
         UpdateColor();
     }
 
-    // =========================
     // SATURATION / VALUE
-    // =========================
-
     public void PickColor(Vector2 uv)
     {
         saturation = Mathf.Clamp01(uv.x);
@@ -104,10 +89,7 @@ public class ColorPicker : MonoBehaviour
         UpdateColor();
     }
 
-    // =========================
     // UPDATE COLOR
-    // =========================
-
     void UpdateColor()
     {
         Color finalColor = Color.HSVToRGB(
@@ -119,10 +101,7 @@ public class ColorPicker : MonoBehaviour
         SetColor(finalColor, true);
     }
 
-    // =========================
     // SET COLOR
-    // =========================
-
     public void SetColor(Color color)
     {
         SetColor(color, true);
@@ -133,26 +112,17 @@ public class ColorPicker : MonoBehaviour
         // Guarda a cor ORIGINAL
         currentColor = color;
 
-        // =========================
         // ENVIA PARA O ESP32
-        // =========================
-
         if (salvarNoComodo && esp32Controller != null)
         {
             esp32Controller.EnviarCor(currentColor);
         }
 
-        // =========================
         // PREVIEW
-        // =========================
-
         if (preview != null)
             preview.color = color;
 
-        // =========================
         // ATUALIZA INPUTS RGB
-        // =========================
-
         if (rInput != null)
         {
             rInput.SetTextWithoutNotify(
@@ -174,10 +144,7 @@ public class ColorPicker : MonoBehaviour
             );
         }
 
-        // =========================
         // SALVAR COR
-        // =========================
-
         if (
             salvarNoComodo &&
             GerenciadorComodos.Instance != null
@@ -187,15 +154,21 @@ public class ColorPicker : MonoBehaviour
         }
     }
 
-    // =========================
     // RGB -> COLOR
-    // =========================
-
     public void UpdateFromRGB()
     {
         int r = ClampInput(rInput.text);
         int g = ClampInput(gInput.text);
         int b = ClampInput(bInput.text);
+
+        if (rInput != null)
+            rInput.SetTextWithoutNotify(r.ToString());
+
+        if (gInput != null)
+            gInput.SetTextWithoutNotify(g.ToString());
+
+        if (bInput != null)
+            bInput.SetTextWithoutNotify(b.ToString());
 
         currentColor = new Color(
             r / 255f,
@@ -203,17 +176,11 @@ public class ColorPicker : MonoBehaviour
             b / 255f
         );
 
-        // =========================
         // PREVIEW
-        // =========================
-
         if (preview != null)
             preview.color = currentColor;
 
-        // =========================
         // ATUALIZA HSV
-        // =========================
-
         Color.RGBToHSV(
             currentColor,
             out hue,
@@ -221,62 +188,75 @@ public class ColorPicker : MonoBehaviour
             out value
         );
 
-        // =========================
         // ATUALIZA SLIDER
-        // =========================
-
+        if (hueSlider != null)
         hueSlider.SetValueWithoutNotify(hue);
 
-        // =========================
         // ATUALIZA TEXTURA
-        // =========================
-
         GenerateSVTexture();
 
-        // =========================
         // ENVIA PARA ESP32
-        // =========================
-
         if (esp32Controller != null)
-        {
             esp32Controller.EnviarCor(currentColor);
-        }
 
-        // =========================
         // SALVA NO CÔMODO
-        // =========================
-
         if (GerenciadorComodos.Instance != null)
-        {
             GerenciadorComodos.Instance.SalvarCor(currentColor);
-        }
     }
 
-    // =========================
     // CARREGAR COR
-    // =========================
-
     public void CarregarCor(Color color)
     {
-        Color.RGBToHSV(
-            color,
-            out hue,
-            out saturation,
-            out value
-        );
+    Color.RGBToHSV(
+        color,
+        out hue,
+        out saturation,
+        out value
+    );
 
-        if (hueSlider != null)
-            hueSlider.SetValueWithoutNotify(hue);
+    if (hueSlider != null)
+        hueSlider.SetValueWithoutNotify(hue);
 
-        GenerateSVTexture();
+    GenerateSVTexture();
 
-        SetColor(color, false);
+    // Posiciona o selector
+    if (selector != null && svImage != null)
+    {
+        RectTransform area = svImage.rectTransform;
+
+        float x = (saturation - 0.5f) * area.rect.width;
+        float y = (value - 0.5f) * area.rect.height;
+
+        selector.anchoredPosition = new Vector2(x, y);
+
+        selector.gameObject.SetActive(true);
     }
 
-    // =========================
-    // INTENSIDADE
-    // =========================
+    currentColor = color;
 
+    if (preview != null)
+        preview.color = color;
+
+    if (rInput != null)
+        rInput.SetTextWithoutNotify(
+            Mathf.RoundToInt(color.r * 255).ToString()
+        );
+
+    if (gInput != null)
+        gInput.SetTextWithoutNotify(
+            Mathf.RoundToInt(color.g * 255).ToString()
+        );
+
+    if (bInput != null)
+        bInput.SetTextWithoutNotify(
+            Mathf.RoundToInt(color.b * 255).ToString()
+        );
+
+    if (esp32Controller != null)
+        esp32Controller.EnviarCor(currentColor);
+    }
+
+    // INTENSIDADE
     public void SetIntensidade(float valor)
     {
         intensidade = Mathf.Clamp01(valor);
@@ -293,10 +273,7 @@ public class ColorPicker : MonoBehaviour
         }
     }
 
-    // =========================
     // INPUT LIMIT
-    // =========================
-
     int ClampInput(string valor)
     {
         int number;
@@ -309,10 +286,7 @@ public class ColorPicker : MonoBehaviour
         return Mathf.Clamp(number, 0, 255);
     }
 
-    // =========================
     // GENERATE TEXTURE
-    // =========================
-
     void GenerateSVTexture()
     {
         int width = 256;
