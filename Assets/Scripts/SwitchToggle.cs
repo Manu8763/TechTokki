@@ -41,31 +41,12 @@ public class SwitchToggle : MonoBehaviour
         }
     }
 
-    void AoAlterarToggle(bool ligado)
-    {
-        UpdateSwitch(ligado);
+    
+void AoAlterarToggle(bool ligado)
+{
+    UpdateSwitch(ligado);
+}
 
-        if (!controlarLampadaDoComodo)
-            return;
-
-        if (esp32Controller == null)
-            return;
-
-        if (GerenciadorComodos.Instance == null)
-            return;
-
-        int numeroComodo =
-            GerenciadorComodos.Instance.NumeroComodoAtual;
-
-        if (ligado)
-        {
-            esp32Controller.LigarComodo(numeroComodo);
-        }
-        else
-        {
-            esp32Controller.DesligarComodo(numeroComodo);
-        }
-    }
 
     // Atualiza somente a aparencia do switch.
     // Pode ser chamado ao trocar de comodo.

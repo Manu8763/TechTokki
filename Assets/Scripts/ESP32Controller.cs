@@ -589,59 +589,85 @@ public class ESP32Controller : MonoBehaviour
         EnviarComando("LED_OFF");
     }
 
+    //SENSOR DE MOVIMENTO
+    
+    public void ConfigurarSensorMovimento(bool ativo)
+    {
+        if (ativo)
+        {
+            EnviarComando("MOTION_ON");
+            Debug.Log("Sensor de movimento ativado.");
+        }
+        else
+        {
+           EnviarComando("MOTION_OFF");
+           Debug.Log("Sensor de movimento desativado.");
+        }
+    }
+
+
     // =====================================================
     // ENVIAR COMANDO TCP
     // =====================================================
 
-    public async void EnviarComando(string comando)
+    
+public async void EnviarComando(string comando)
+{
+    if (!ativo)
+        return;
+
+    await travaEnvio.WaitAsync();
+
+    try
     {
-        if (!ativo)
-            return;
+        // Aguarda a conexão inicial ou uma reconexão.
+        int espera = 0;
 
-        await travaEnvio.WaitAsync();
-
-        try
+        while (
+            ativo &&
+            (!conectado || cliente == null || stream == null) &&
+            espera < 15000
+        )
         {
-            if (
-                !conectado ||
-                cliente == null ||
-                !cliente.Connected ||
-                stream == null
-            )
-            {
-                Debug.LogWarning(
-                    "ESP32 não está conectado. Comando não enviado: "
-                    + comando
-                );
-
-                return;
-            }
-
-            byte[] dados = Encoding.UTF8.GetBytes(
-                comando + "\n"
-            );
-
-            await stream.WriteAsync(
-                dados,
-                0,
-                dados.Length
-            );
-
-            Debug.Log("Comando enviado: " + comando);
+            await Task.Delay(100);
+            espera += 100;
         }
-        catch (Exception erro)
+
+        if (
+            !ativo ||
+            !conectado ||
+            cliente == null ||
+            !cliente.Connected ||
+            stream == null
+        )
         {
             Debug.LogWarning(
-                "Erro ao enviar comando: " + erro.Message
+                "ESP32 não conectado. Comando não enviado: " + comando
             );
 
-            Desconectar();
+            return;
         }
-        finally
-        {
-            travaEnvio.Release();
-        }
+
+        byte[] dados = Encoding.UTF8.GetBytes(comando + "\n");
+
+        await stream.WriteAsync(dados, 0, dados.Length);
+
+        Debug.Log("Comando enviado: " + comando);
     }
+    catch (Exception erro)
+    {
+        Debug.LogWarning(
+            "Erro ao enviar comando: " + erro.Message
+        );
+
+        Desconectar();
+    }
+    finally
+    {
+        travaEnvio.Release();
+    }
+}
+
 
     // =====================================================
     // DESCONECTAR

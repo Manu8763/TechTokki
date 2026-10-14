@@ -7,6 +7,9 @@ public class GerenciadorComodos : MonoBehaviour
 {
     public static GerenciadorComodos Instance;
 
+    [Header("Controle ESP32")]
+    public ESP32Controller esp32Controller;
+
     [Header("Cor")]
     public ColorPicker colorPicker;
 
@@ -312,13 +315,20 @@ public class GerenciadorComodos : MonoBehaviour
         comodos[comodoAtual].horarioApagar = valor;
     }
 
-    private void SalvarMovimento(bool valor)
-    {
-        if (!ComodoAtualValido())
-            return;
+    
+private void SalvarMovimento(bool valor)
+{
+    if (!ComodoAtualValido())
+        return;
 
-        comodos[comodoAtual].sensorMovimento = valor;
+    comodos[comodoAtual].sensorMovimento = valor;
+
+    if (esp32Controller != null)
+    {
+        esp32Controller.ConfigurarSensorMovimento(valor);
     }
+}
+
 
     private void SalvarLuminosidade(bool valor)
     {
