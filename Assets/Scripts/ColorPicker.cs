@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
@@ -22,86 +23,75 @@ public class ColorPicker : MonoBehaviour
     [Header("Selector")]
     public RectTransform selector;
 
-    // ESP32
+    [Header("ESP32")]
     public ESP32Controller esp32Controller;
 
-    // VARIÁVEIS
     private Texture2D svTexture;
-
-    // Cor escolhida pelo usuário
-    // SEM considerar intensidade
-    private Color currentColor;
-
-    // Intensidade atual
+    private Color currentColor = Color.white;
     private float intensidade = 1f;
 
-    // START
     void Start()
     {
-        // Slider do Hue
-        hueSlider.onValueChanged.AddListener(OnHueChanged);
+        if (hueSlider != null)
+            hueSlider.onValueChanged.AddListener(OnHueChanged);
 
-        // Inputs RGB
-        rInput.onEndEdit.AddListener(delegate
-        {
-            UpdateFromRGB();
-        });
+        if (rInput != null)
+            rInput.onEndEdit.AddListener(delegate { UpdateFromRGB(); });
 
-        gInput.onEndEdit.AddListener(delegate
-        {
-            UpdateFromRGB();
-        });
+        if (gInput != null)
+            gInput.onEndEdit.AddListener(delegate { UpdateFromRGB(); });
 
-        bInput.onEndEdit.AddListener(delegate
-        {
-            UpdateFromRGB();
-        });
+        if (bInput != null)
+            bInput.onEndEdit.AddListener(delegate { UpdateFromRGB(); });
 
-        // Gera textura inicial
         GenerateSVTexture();
 
-        // Cor inicial
         SetColor(
-            Color.HSVToRGB(
-                hue,
-                saturation,
-                value
-            ),
+            Color.HSVToRGB(hue, saturation, value),
             false
         );
     }
 
-    // HUE
+    void OnDestroy()
+    {
+        if (hueSlider != null)
+            hueSlider.onValueChanged.RemoveListener(OnHueChanged);
+
+        if (rInput != null)
+            rInput.onEndEdit.RemoveAllListeners();
+
+        if (gInput != null)
+            gInput.onEndEdit.RemoveAllListeners();
+
+        if (bInput != null)
+            bInput.onEndEdit.RemoveAllListeners();
+
+        if (svTexture != null)
+            Destroy(svTexture);
+    }
+
     void OnHueChanged(float h)
     {
         hue = h;
-
         GenerateSVTexture();
         UpdateColor();
     }
 
-    // SATURATION / VALUE
     public void PickColor(Vector2 uv)
     {
         saturation = Mathf.Clamp01(uv.x);
         value = Mathf.Clamp01(uv.y);
-
         UpdateColor();
     }
 
-    // UPDATE COLOR
     void UpdateColor()
     {
-        Color finalColor = Color.HSVToRGB(
-            hue,
-            saturation,
-            value
+        SetColor(
+            Color.HSVToRGB(hue, saturation, value),
+            true
         );
-
-        SetColor(finalColor, true);
     }
 
-    // SET COLOR
     public void SetColor(Color color)
     {
         SetColor(color, true);
@@ -109,78 +99,8 @@ public class ColorPicker : MonoBehaviour
 
     public void SetColor(Color color, bool salvarNoComodo)
     {
-        // Guarda a cor ORIGINAL
         currentColor = color;
 
-        // ENVIA PARA O ESP32
-        if (salvarNoComodo && esp32Controller != null)
-        {
-            esp32Controller.EnviarCor(currentColor);
-        }
-
-        // PREVIEW
-        if (preview != null)
-            preview.color = color;
-
-        // ATUALIZA INPUTS RGB
-        if (rInput != null)
-        {
-            rInput.SetTextWithoutNotify(
-                Mathf.RoundToInt(color.r * 255).ToString()
-            );
-        }
-
-        if (gInput != null)
-        {
-            gInput.SetTextWithoutNotify(
-                Mathf.RoundToInt(color.g * 255).ToString()
-            );
-        }
-
-        if (bInput != null)
-        {
-            bInput.SetTextWithoutNotify(
-                Mathf.RoundToInt(color.b * 255).ToString()
-            );
-        }
-
-        // SALVAR COR
-        if (
-            salvarNoComodo &&
-            GerenciadorComodos.Instance != null
-        )
-        {
-            GerenciadorComodos.Instance.SalvarCor(color);
-        }
-    }
-
-    // RGB -> COLOR
-    public void UpdateFromRGB()
-    {
-        int r = ClampInput(rInput.text);
-        int g = ClampInput(gInput.text);
-        int b = ClampInput(bInput.text);
-
-        if (rInput != null)
-            rInput.SetTextWithoutNotify(r.ToString());
-
-        if (gInput != null)
-            gInput.SetTextWithoutNotify(g.ToString());
-
-        if (bInput != null)
-            bInput.SetTextWithoutNotify(b.ToString());
-
-        currentColor = new Color(
-            r / 255f,
-            g / 255f,
-            b / 255f
-        );
-
-        // PREVIEW
-        if (preview != null)
-            preview.color = currentColor;
-
-        // ATUALIZA HSV
         Color.RGBToHSV(
             currentColor,
             out hue,
@@ -188,105 +108,148 @@ public class ColorPicker : MonoBehaviour
             out value
         );
 
-        // ATUALIZA SLIDER
         if (hueSlider != null)
-        hueSlider.SetValueWithoutNotify(hue);
+            hueSlider.SetValueWithoutNotify(hue);
 
-        // ATUALIZA TEXTURA
         GenerateSVTexture();
+        AtualizarInterfaceRGB();
 
-        // ENVIA PARA ESP32
-        if (esp32Controller != null)
-            esp32Controller.EnviarCor(currentColor);
+        if (!salvarNoComodo)
+            return;
 
-        // SALVA NO CÔMODO
         if (GerenciadorComodos.Instance != null)
             GerenciadorComodos.Instance.SalvarCor(currentColor);
+
+        EnviarCorDoComodo();
     }
 
-    // CARREGAR COR
+    public void UpdateFromRGB()
+    {
+        int r = ClampInput(rInput != null ? rInput.text : "0");
+        int g = ClampInput(gInput != null ? gInput.text : "0");
+        int b = ClampInput(bInput != null ? bInput.text : "0");
+
+        currentColor = new Color(
+            r / 255f,
+            g / 255f,
+            b / 255f
+        );
+
+        Color.RGBToHSV(
+            currentColor,
+            out hue,
+            out saturation,
+            out value
+        );
+
+        if (hueSlider != null)
+            hueSlider.SetValueWithoutNotify(hue);
+
+        GenerateSVTexture();
+        AtualizarInterfaceRGB();
+
+        if (GerenciadorComodos.Instance != null)
+            GerenciadorComodos.Instance.SalvarCor(currentColor);
+
+        EnviarCorDoComodo();
+    }
+
+    // Carrega a cor salva sem enviar comandos ao ESP32.
     public void CarregarCor(Color color)
     {
-    Color.RGBToHSV(
-        color,
-        out hue,
-        out saturation,
-        out value
-    );
+        currentColor = color;
 
-    if (hueSlider != null)
-        hueSlider.SetValueWithoutNotify(hue);
+        Color.RGBToHSV(
+            color,
+            out hue,
+            out saturation,
+            out value
+        );
 
-    GenerateSVTexture();
+        if (hueSlider != null)
+            hueSlider.SetValueWithoutNotify(hue);
 
-    // Posiciona o selector
-    if (selector != null && svImage != null)
+        GenerateSVTexture();
+        AtualizarInterfaceRGB();
+
+        if (selector != null && svImage != null)
+        {
+            RectTransform area = svImage.rectTransform;
+
+            float x = (saturation - 0.5f) * area.rect.width;
+            float y = (value - 0.5f) * area.rect.height;
+
+            selector.anchoredPosition = new Vector2(x, y);
+            selector.gameObject.SetActive(true);
+        }
+    }
+
+    // Carrega a intensidade salva sem enviar comandos.
+    public void CarregarIntensidade(float valor)
     {
-        RectTransform area = svImage.rectTransform;
-
-        float x = (saturation - 0.5f) * area.rect.width;
-        float y = (value - 0.5f) * area.rect.height;
-
-        selector.anchoredPosition = new Vector2(x, y);
-
-        selector.gameObject.SetActive(true);
+        intensidade = Mathf.Clamp01(valor);
     }
 
-    currentColor = color;
-
-    if (preview != null)
-        preview.color = color;
-
-    if (rInput != null)
-        rInput.SetTextWithoutNotify(
-            Mathf.RoundToInt(color.r * 255).ToString()
-        );
-
-    if (gInput != null)
-        gInput.SetTextWithoutNotify(
-            Mathf.RoundToInt(color.g * 255).ToString()
-        );
-
-    if (bInput != null)
-        bInput.SetTextWithoutNotify(
-            Mathf.RoundToInt(color.b * 255).ToString()
-        );
-
-    if (esp32Controller != null)
-        esp32Controller.EnviarCor(currentColor);
-    }
-
-    // INTENSIDADE
     public void SetIntensidade(float valor)
     {
         intensidade = Mathf.Clamp01(valor);
 
         Debug.Log(
-            "Intensidade selecionada: " +
-            Mathf.RoundToInt(intensidade * 100) +
+            "Intensidade: " +
+            Mathf.RoundToInt(intensidade * 100f) +
             "%"
         );
 
-        if (esp32Controller != null)
-        {
-            esp32Controller.DefinirIntensidade(intensidade);
-        }
+        EnviarCorDoComodo();
     }
 
-    // INPUT LIMIT
-    int ClampInput(string valor)
+    void EnviarCorDoComodo()
     {
-        int number;
+        if (esp32Controller == null)
+            return;
 
-        if (!int.TryParse(valor, out number))
-        {
-            number = 0;
-        }
+        if (GerenciadorComodos.Instance == null)
+            return;
 
-        return Mathf.Clamp(number, 0, 255);
+        int numeroComodo =
+            GerenciadorComodos.Instance.NumeroComodoAtual;
+
+        esp32Controller.EnviarCorComodo(
+            numeroComodo,
+            currentColor,
+            intensidade
+        );
     }
 
-    // GENERATE TEXTURE
+    void AtualizarInterfaceRGB()
+    {
+        if (preview != null)
+            preview.color = currentColor;
+
+        if (rInput != null)
+            rInput.SetTextWithoutNotify(
+                Mathf.RoundToInt(currentColor.r * 255f).ToString()
+            );
+
+        if (gInput != null)
+            gInput.SetTextWithoutNotify(
+                Mathf.RoundToInt(currentColor.g * 255f).ToString()
+            );
+
+        if (bInput != null)
+            bInput.SetTextWithoutNotify(
+                Mathf.RoundToInt(currentColor.b * 255f).ToString()
+            );
+    }
+
+    int ClampInput(string texto)
+    {
+        if (!int.TryParse(texto, out int numero))
+            numero = 0;
+
+        return Mathf.Clamp(numero, 0, 255);
+    }
+
     void GenerateSVTexture()
     {
         int width = 256;
@@ -296,33 +259,33 @@ public class ColorPicker : MonoBehaviour
         {
             svTexture = new Texture2D(
                 width,
-                height
+                height,
+                TextureFormat.RGB24,
+                false
             );
+
+            svTexture.wrapMode = TextureWrapMode.Clamp;
+            svTexture.filterMode = FilterMode.Bilinear;
         }
 
         for (int y = 0; y < height; y++)
         {
             for (int x = 0; x < width; x++)
             {
-                float s = (float)x / width;
-                float v = (float)y / height;
-
-                Color color = Color.HSVToRGB(
-                    hue,
-                    s,
-                    v
-                );
+                float s = (float)x / (width - 1);
+                float v = (float)y / (height - 1);
 
                 svTexture.SetPixel(
                     x,
                     y,
-                    color
+                    Color.HSVToRGB(hue, s, v)
                 );
             }
         }
 
         svTexture.Apply();
 
-        svImage.texture = svTexture;
+        if (svImage != null)
+            svImage.texture = svTexture;
     }
 }

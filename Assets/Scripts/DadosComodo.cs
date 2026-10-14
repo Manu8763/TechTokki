@@ -8,7 +8,7 @@ public class DadosComodo
     [Header("Luz")]
     public bool luzLigada = false;
     [Range(0, 100)]
-    public int intensidade = 100;
+    public float intensidade = 1f;
     public Color cor = Color.white;
 
     [Header("Programação")]

@@ -1,8 +1,11 @@
+
 using UnityEngine;
+using System;
 using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
 
@@ -13,6 +16,9 @@ public class ESP32Controller : MonoBehaviour
     // =====================================================
 
     private const int portaTCP = 8080;
+    private const int tempoTesteIP = 500;
+    private const int tempoConexao = 3000;
+    private const int intervaloReconexao = 2000;
 
     // =====================================================
     // CONEXÃO
@@ -23,29 +29,19 @@ public class ESP32Controller : MonoBehaviour
 
     private bool conectado = false;
     private bool conectando = false;
+    private bool ativo = true;
 
-    private string enderecoESP32 = null;
+    private string enderecoESP32;
 
-    // =====================================================
-    // CONTROLE DE COR
-    // =====================================================
-
-    private bool corAtiva = false;
-
-    // Cor escolhida pelo usuário
-    // SEM intensidade
-    private Color ultimaCor = Color.white;
-
-    // Intensidade escolhida pelo usuário
-    // 1 = 100%
-    // 0.5 = 50%
-    private float intensidadeAtual = 1f;
+    // Evita que dois comandos escrevam no TCP ao mesmo tempo.
+    private readonly SemaphoreSlim travaEnvio =
+        new SemaphoreSlim(1, 1);
 
     // =====================================================
-    // START
+    // INICIALIZAÇÃO
     // =====================================================
 
-    async void Start()
+    private async void Start()
     {
         Debug.Log("=================================");
         Debug.Log("ESP32 CONTROLLER INICIADO");
@@ -55,19 +51,22 @@ public class ESP32Controller : MonoBehaviour
     }
 
     // =====================================================
-    // CONECTAR CONTINUAMENTE
+    // CONEXÃO CONTÍNUA
     // =====================================================
 
-    async Task ConectarContinuamente()
+    private async Task ConectarContinuamente()
     {
-        while (true)
+        while (ativo)
         {
             if (!conectado && !conectando)
             {
                 await DescobrirEConectar();
             }
 
-            await Task.Delay(2000);
+            if (!ativo)
+                break;
+
+            await Task.Delay(intervaloReconexao);
         }
     }
 
@@ -75,14 +74,11 @@ public class ESP32Controller : MonoBehaviour
     // DESCOBRIR ESP32
     // =====================================================
 
-    async Task<string> DescobrirESP32()
+    private async Task<string> DescobrirESP32()
     {
-        Debug.Log("=================================");
-        Debug.Log("PROCURANDO ESP32...");
-        Debug.Log("=================================");
+        Debug.Log("Procurando ESP32 na rede local...");
 
-        List<string> enderecos =
-            ObterEnderecosDaRede();
+        List<string> enderecos = ObterEnderecosDaRede();
 
         if (enderecos.Count == 0)
         {
@@ -94,196 +90,188 @@ public class ESP32Controller : MonoBehaviour
         }
 
         Debug.Log(
-            "IPs encontrados para testar: " +
-            enderecos.Count
+            "Endereços para testar: " + enderecos.Count
         );
 
-        List<Task<string>> tarefas =
-            new List<Task<string>>();
+        List<Task<string>> tarefas = new List<Task<string>>();
 
         foreach (string ip in enderecos)
         {
+            if (!ativo)
+                break;
+
             tarefas.Add(TestarIP(ip));
         }
 
-        while (tarefas.Count > 0)
+        while (tarefas.Count > 0 && ativo)
         {
-            Task<string> tarefa =
-                await Task.WhenAny(tarefas);
-
+            Task<string> tarefa = await Task.WhenAny(tarefas);
             tarefas.Remove(tarefa);
 
-            string resultado =
-                await tarefa;
+            string resultado = null;
+
+            try
+            {
+                resultado = await tarefa;
+            }
+            catch (Exception erro)
+            {
+                Debug.LogWarning(
+                    "Erro ao testar endereço: " + erro.Message
+                );
+            }
 
             if (!string.IsNullOrEmpty(resultado))
             {
-                Debug.Log("=================================");
-                Debug.Log("ESP32 ENCONTRADO!");
-                Debug.Log("IP: " + resultado);
-                Debug.Log("=================================");
-
+                Debug.Log("ESP32 encontrado em: " + resultado);
                 return resultado;
             }
         }
 
-        Debug.LogWarning(
-            "Nenhum ESP32 encontrado na rede."
-        );
+        if (ativo)
+        {
+            Debug.LogWarning(
+                "Nenhum ESP32 encontrado. Tentarei novamente."
+            );
+        }
 
         return null;
     }
 
     // =====================================================
-    // OBTER IPS DA REDE
+    // OBTER ENDEREÇOS DA REDE LOCAL
     // =====================================================
 
-    List<string> ObterEnderecosDaRede()
+    private List<string> ObterEnderecosDaRede()
     {
-        List<string> resultado =
-            new List<string>();
+        HashSet<string> enderecos = new HashSet<string>();
 
-        foreach (
-            NetworkInterface rede
-            in NetworkInterface.GetAllNetworkInterfaces()
-        )
+        try
         {
-            if (
-                rede.OperationalStatus !=
-                OperationalStatus.Up
-            )
-            {
-                continue;
-            }
-
-            if (
-                rede.NetworkInterfaceType ==
-                NetworkInterfaceType.Loopback
-            )
-            {
-                continue;
-            }
-
-            IPInterfaceProperties propriedades =
-                rede.GetIPProperties();
-
             foreach (
-                UnicastIPAddressInformation endereco
-                in propriedades.UnicastAddresses
+                NetworkInterface rede
+                in NetworkInterface.GetAllNetworkInterfaces()
             )
             {
+                if (!ativo)
+                    break;
+
                 if (
-                    endereco.Address.AddressFamily !=
-                    AddressFamily.InterNetwork
+                    rede.OperationalStatus !=
+                    OperationalStatus.Up
+                )
+                    continue;
+
+                if (
+                    rede.NetworkInterfaceType ==
+                    NetworkInterfaceType.Loopback
+                )
+                    continue;
+
+                IPInterfaceProperties propriedades =
+                    rede.GetIPProperties();
+
+                foreach (
+                    UnicastIPAddressInformation endereco
+                    in propriedades.UnicastAddresses
                 )
                 {
-                    continue;
-                }
+                    if (
+                        endereco.Address.AddressFamily !=
+                        AddressFamily.InterNetwork
+                    )
+                        continue;
 
-                IPAddress ip =
-                    endereco.Address;
+                    IPAddress ip = endereco.Address;
+                    IPAddress mascara = endereco.IPv4Mask;
 
-                IPAddress mascara =
-                    endereco.IPv4Mask;
+                    if (mascara == null)
+                        continue;
 
-                if (mascara == null)
-                    continue;
+                    byte[] ipBytes = ip.GetAddressBytes();
+                    byte[] mascaraBytes = mascara.GetAddressBytes();
 
-                byte[] ipBytes =
-                    ip.GetAddressBytes();
+                    byte[] redeBytes = new byte[4];
 
-                byte[] mascaraBytes =
-                    mascara.GetAddressBytes();
-
-                byte[] redeBytes =
-                    new byte[4];
-
-                for (int i = 0; i < 4; i++)
-                {
-                    redeBytes[i] =
-                        (byte)(
-                            ipBytes[i] &
-                            mascaraBytes[i]
+                    for (int i = 0; i < 4; i++)
+                    {
+                        redeBytes[i] = (byte)(
+                            ipBytes[i] & mascaraBytes[i]
                         );
-                }
+                    }
 
-                int primeiro =
-                    EnderecoParaInt(redeBytes);
-
-                int mascaraInt =
-                    EnderecoParaInt(mascaraBytes);
-
-                int broadcast =
-                    primeiro |
-                    (~mascaraInt);
-
-                int inicio = primeiro + 1;
-                int fim = broadcast - 1;
-
-                if (fim - inicio > 1024)
-                {
-                    Debug.LogWarning(
-                        "Rede muito grande. " +
-                        "Ignorando interface: " +
-                        ip
+                    uint inicioRede = EnderecoParaUInt(redeBytes);
+                    uint mascaraNumero = EnderecoParaUInt(
+                        mascaraBytes
                     );
 
-                    continue;
-                }
+                    uint broadcast =
+                        inicioRede | (~mascaraNumero);
 
-                for (
-                    int numero = inicio;
-                    numero <= fim;
-                    numero++
-                )
-                {
-                    resultado.Add(
-                        IntParaEndereco(numero)
+                    // Evita testar a própria rede e o broadcast.
+                    if (broadcast <= inicioRede + 1)
+                        continue;
+
+                    uint inicio = inicioRede + 1;
+                    uint fim = broadcast - 1;
+
+                    // Evita varreduras enormes.
+                    if (fim - inicio > 1024)
+                    {
+                        Debug.LogWarning(
+                            "Rede muito grande; ignorando interface: "
+                            + ip
+                        );
+
+                        continue;
+                    }
+
+                    Debug.Log(
+                        "Rede detectada: " + ip + " / " + mascara
                     );
-                }
 
-                Debug.Log(
-                    "Rede detectada: " +
-                    ip +
-                    " / " +
-                    mascara
-                );
+                    for (uint numero = inicio; numero <= fim; numero++)
+                    {
+                        string enderecoIP = UIntParaEndereco(numero);
+
+                        // Não testa o próprio dispositivo.
+                        if (enderecoIP == ip.ToString())
+                            continue;
+
+                        enderecos.Add(enderecoIP);
+                    }
+                }
             }
         }
+        catch (Exception erro)
+        {
+            Debug.LogWarning(
+                "Erro ao obter endereços da rede: " + erro.Message
+            );
+        }
 
-        return resultado;
+        return new List<string>(enderecos);
     }
 
     // =====================================================
-    // IP → INT
+    // CONVERSÃO DE ENDEREÇO
     // =====================================================
 
-    int EnderecoParaInt(byte[] bytes)
+    private uint EnderecoParaUInt(byte[] bytes)
     {
         return
-            (bytes[0] << 24) |
-            (bytes[1] << 16) |
-            (bytes[2] << 8) |
+            ((uint)bytes[0] << 24) |
+            ((uint)bytes[1] << 16) |
+            ((uint)bytes[2] << 8) |
             bytes[3];
     }
 
-    // =====================================================
-    // INT → IP
-    // =====================================================
-
-    string IntParaEndereco(int valor)
+    private string UIntParaEndereco(uint valor)
     {
-        byte a =
-            (byte)((valor >> 24) & 255);
-
-        byte b =
-            (byte)((valor >> 16) & 255);
-
-        byte c =
-            (byte)((valor >> 8) & 255);
-
-        byte d =
-            (byte)(valor & 255);
+        byte a = (byte)((valor >> 24) & 255);
+        byte b = (byte)((valor >> 16) & 255);
+        byte c = (byte)((valor >> 8) & 255);
+        byte d = (byte)(valor & 255);
 
         return $"{a}.{b}.{c}.{d}";
     }
@@ -292,175 +280,149 @@ public class ESP32Controller : MonoBehaviour
     // TESTAR IP
     // =====================================================
 
-    async Task<string> TestarIP(string ip)
+    private async Task<string> TestarIP(string ip)
     {
+        TcpClient teste = new TcpClient();
+
         try
         {
-            TcpClient teste =
-                new TcpClient();
+            Task conexao = teste.ConnectAsync(ip, portaTCP);
 
-            Task conexao =
-                teste.ConnectAsync(
-                    ip,
-                    portaTCP
-                );
+            Task terminou = await Task.WhenAny(
+                conexao,
+                Task.Delay(tempoTesteIP)
+            );
 
-            Task terminado =
-                await Task.WhenAny(
-                    conexao,
-                    Task.Delay(500)
-                );
+            if (terminou != conexao)
+                return null;
 
-            if (
-                terminado == conexao &&
-                teste.Connected
-            )
-            {
-                teste.Close();
+            // Observa possíveis erros da conexão.
+            await conexao;
 
-                Debug.Log(
-                    "Servidor encontrado em: " +
-                    ip
-                );
-
+            if (teste.Connected)
                 return ip;
-            }
 
-            teste.Close();
+            return null;
         }
         catch
         {
+            return null;
         }
-
-        return null;
+        finally
+        {
+            teste.Close();
+        }
     }
 
     // =====================================================
     // DESCOBRIR E CONECTAR
     // =====================================================
 
-    async Task DescobrirEConectar()
+    private async Task DescobrirEConectar()
     {
-        if (conectando)
+        if (conectando || !ativo)
             return;
 
         conectando = true;
 
         try
         {
-            enderecoESP32 =
-                await DescobrirESP32();
+            enderecoESP32 = await DescobrirESP32();
 
             if (
-                string.IsNullOrEmpty(
-                    enderecoESP32
-                )
+                !ativo ||
+                string.IsNullOrEmpty(enderecoESP32)
             )
-            {
-                conectando = false;
                 return;
-            }
 
             await Conectar();
         }
-        catch (
-            System.Exception erro
-        )
+        catch (Exception erro)
         {
             Debug.LogWarning(
-                "Erro na conexão: " +
-                erro.Message
+                "Erro durante a conexão: " + erro.Message
             );
         }
-
-        conectando = false;
+        finally
+        {
+            conectando = false;
+        }
     }
 
     // =====================================================
-    // CONECTAR TCP
+    // CONECTAR POR TCP
     // =====================================================
 
-    async Task Conectar()
+    private async Task Conectar()
     {
         if (
-            string.IsNullOrEmpty(
-                enderecoESP32
-            )
+            !ativo ||
+            string.IsNullOrEmpty(enderecoESP32)
         )
-        {
             return;
-        }
 
         Debug.Log(
             "Conectando ao ESP32 em " +
-            enderecoESP32 +
-            ":" +
-            portaTCP
+            enderecoESP32 + ":" + portaTCP
         );
+
+        TcpClient novoCliente = new TcpClient();
 
         try
         {
-            TcpClient novoCliente =
-                new TcpClient();
+            Task conexao = novoCliente.ConnectAsync(
+                enderecoESP32,
+                portaTCP
+            );
 
-            Task conexao =
-                novoCliente.ConnectAsync(
-                    enderecoESP32,
-                    portaTCP
-                );
+            Task terminou = await Task.WhenAny(
+                conexao,
+                Task.Delay(tempoConexao)
+            );
 
-            Task terminado =
-                await Task.WhenAny(
-                    conexao,
-                    Task.Delay(3000)
-                );
-
-            if (terminado != conexao)
+            if (terminou != conexao)
             {
-                novoCliente.Close();
-
                 Debug.LogWarning(
-                    "Tempo esgotado ao conectar."
+                    "Tempo esgotado ao conectar ao ESP32."
                 );
 
                 return;
             }
 
-            if (!novoCliente.Connected)
-            {
-                novoCliente.Close();
+            await conexao;
 
-                Debug.LogWarning(
-                    "Não foi possível conectar."
-                );
-
+            if (!ativo || !novoCliente.Connected)
                 return;
-            }
 
             cliente = novoCliente;
             stream = cliente.GetStream();
             conectado = true;
+
+            // A propriedade do cliente passa para a classe.
+            novoCliente = null;
 
             Debug.Log("=================================");
             Debug.Log("ESP32 CONECTADO COM SUCESSO!");
             Debug.Log("IP: " + enderecoESP32);
             Debug.Log("=================================");
         }
-        catch (
-            System.Exception erro
-        )
+        catch (Exception erro)
         {
             Debug.LogWarning(
-                "Erro ao conectar: " +
-                erro.Message
+                "Erro ao conectar: " + erro.Message
             );
 
             Desconectar();
         }
+        finally
+        {
+            if (novoCliente != null)
+                novoCliente.Close();
+        }
     }
 
     // =====================================================
-    // PROGRAMAÇÃO
+    // PROGRAMAÇÃO DIÁRIA GLOBAL
     // =====================================================
 
     public void ProgramarLuzes(
@@ -468,219 +430,196 @@ public class ESP32Controller : MonoBehaviour
         string horarioDesligar
     )
     {
+        if (
+            string.IsNullOrWhiteSpace(horarioLigar) ||
+            string.IsNullOrWhiteSpace(horarioDesligar)
+        )
+        {
+            Debug.LogWarning(
+                "Informe os horários para programar as luzes."
+            );
+
+            return;
+        }
+
         string comando =
             $"PROGRAMAR:{horarioLigar},{horarioDesligar}";
 
         Debug.Log(
             "Programando luzes: " +
-            horarioLigar +
-            " -> " +
-            horarioDesligar
+            horarioLigar + " -> " + horarioDesligar
         );
 
         EnviarComando(comando);
     }
 
-    // =====================================================
-    // CANCELAR PROGRAMAÇÃO
-    // =====================================================
-
     public void CancelarProgramacao()
     {
-        Debug.Log(
-            "Cancelando programação..."
-        );
+        Debug.Log("Cancelando programação das luzes...");
 
-        EnviarComando(
-            "CANCELAR_PROGRAMACAO"
-        );
+        EnviarComando("CANCELAR_PROGRAMACAO");
     }
 
     // =====================================================
-    // TOGGLE DE COR
+    // CONTROLE INDIVIDUAL POR CÔMODO
+    // Cômodo 1 = Sala de Estar
+    // Cômodo 2 = Cozinha
+    // Cômodo 3 = Quarto
+    // Cômodo 4 = Banheiro
     // =====================================================
 
     public void AlternarCor(bool ativo)
     {
-        corAtiva = ativo;
+        if (GerenciadorComodos.Instance == null)
+            return;
 
-        Debug.Log(
-            "Controle de cor: " +
-            ativo
-        );
+        int numeroComodo =
+            GerenciadorComodos.Instance.NumeroComodoAtual;
 
-        if (corAtiva)
-        {
-            // Liga o controle de cor
-            // respeitando a intensidade atual
-            EnviarCorComIntensidade();
-        }
+        if (ativo)
+            LigarComodo(numeroComodo);
         else
-        {
-            // Desativa o controle de cor
-            EnviarComando(
-                "RGB:255,255,255"
-            );
-        }
+            DesligarComodo(numeroComodo);
     }
 
-    // =====================================================
-    // RECEBER COR DO COLOR PICKER
-    // =====================================================
-
-    public void EnviarCor(Color cor)
+    public void LigarComodo(int numeroComodo)
     {
-        if (!corAtiva)
-        {
-            Debug.Log(
-                "COR NÃO ENVIADA: Toggle está DESATIVADO."
-            );
-
+        if (!NumeroComodoValido(numeroComodo))
             return;
-        }
 
-        // Guarda a cor original
-        ultimaCor = cor;
+        EnviarComando($"ROOM_ON:{numeroComodo}");
+    }
 
-        Debug.Log(
-            "Nova cor escolhida: " +
-            Mathf.RoundToInt(cor.r * 255) +
-            "," +
-            Mathf.RoundToInt(cor.g * 255) +
-            "," +
-            Mathf.RoundToInt(cor.b * 255)
+    public void DesligarComodo(int numeroComodo)
+    {
+        if (!NumeroComodoValido(numeroComodo))
+            return;
+
+        EnviarComando($"ROOM_OFF:{numeroComodo}");
+    }
+
+    // Envia cor e intensidade para apenas uma lâmpada.
+    public void EnviarCorComodo(
+        int numeroComodo,
+        Color cor,
+        float intensidade
+    )
+    {
+        if (!NumeroComodoValido(numeroComodo))
+            return;
+
+        intensidade = Mathf.Clamp01(intensidade);
+
+        int r = Mathf.RoundToInt(
+            Mathf.Clamp01(cor.r) * intensidade * 255f
         );
 
-        EnviarCorComIntensidade();
-    }
-
-    // =====================================================
-    // RECEBER INTENSIDADE
-    // =====================================================
-
-    public void DefinirIntensidade(float intensidade)
-    {
-        intensidadeAtual =
-            Mathf.Clamp01(intensidade);
-
-        Debug.Log(
-            "Nova intensidade: " +
-            Mathf.RoundToInt(
-                intensidadeAtual * 100
-            ) +
-            "%"
+        int g = Mathf.RoundToInt(
+            Mathf.Clamp01(cor.g) * intensidade * 255f
         );
 
-        // Só envia se o controle de cor
-        // estiver ativo
-        if (corAtiva)
-        {
-            EnviarCorComIntensidade();
-        }
-    }
-
-    // =====================================================
-    // CALCULAR E ENVIAR COR + INTENSIDADE
-    // =====================================================
-
-    void EnviarCorComIntensidade()
-    {
-        if (!corAtiva)
-        {
-            Debug.Log(
-                "COR NÃO ENVIADA: Toggle está DESATIVADO."
-            );
-
-            return;
-        }
-
-        // Aplica intensidade à cor original
-        Color corFinal =
-            new Color(
-                ultimaCor.r * intensidadeAtual,
-                ultimaCor.g * intensidadeAtual,
-                ultimaCor.b * intensidadeAtual
-            );
-
-        int r =
-            Mathf.RoundToInt(
-                corFinal.r * 255
-            );
-
-        int g =
-            Mathf.RoundToInt(
-                corFinal.g * 255
-            );
-
-        int b =
-            Mathf.RoundToInt(
-                corFinal.b * 255
-            );
-
-        Debug.Log(
-            $"ENVIANDO RGB: {r},{g},{b}"
+        int b = Mathf.RoundToInt(
+            Mathf.Clamp01(cor.b) * intensidade * 255f
         );
 
         EnviarComando(
-            $"RGB:{r},{g},{b}"
+            $"ROOM_RGB:{numeroComodo},{r},{g},{b}"
+        );
+    }
+
+    private bool NumeroComodoValido(int numeroComodo)
+    {
+        if (numeroComodo >= 1 && numeroComodo <= 4)
+            return true;
+
+        Debug.LogWarning(
+            "Número de cômodo inválido: " + numeroComodo
+        );
+
+        return false;
+    }
+
+    // Compatibilidade com chamadas antigas do ColorPicker.
+    public void EnviarCor(Color cor)
+    {
+        if (GerenciadorComodos.Instance == null)
+            return;
+
+        EnviarCorComodo(
+            GerenciadorComodos.Instance.NumeroComodoAtual,
+            cor,
+            GerenciadorComodos.Instance.IntensidadeAtual
+        );
+    }
+
+    // Atualiza a intensidade mantendo a cor salva no cômodo.
+    public void DefinirIntensidade(float intensidade)
+    {
+        if (GerenciadorComodos.Instance == null)
+            return;
+
+        GerenciadorComodos gerenciador =
+            GerenciadorComodos.Instance;
+
+        int numeroComodo = gerenciador.NumeroComodoAtual;
+
+        if (!NumeroComodoValido(numeroComodo))
+            return;
+
+        Color cor = gerenciador.comodos[numeroComodo - 1].cor;
+
+        EnviarCorComodo(
+            numeroComodo,
+            cor,
+            intensidade
         );
     }
 
     // =====================================================
-    // LIGAR LED
+    // CONTROLE GLOBAL: TODAS AS LÂMPADAS
     // =====================================================
 
     public void LigarLED()
     {
-        // Liga fisicamente
         EnviarComando("LED_ON");
-
-        // Depois restaura a cor e intensidade
-        if (corAtiva)
-        {
-            EnviarCorComIntensidade();
-        }
     }
-
-    // =====================================================
-    // DESLIGAR LED
-    // =====================================================
 
     public void DesligarLED()
     {
-        EnviarComando(
-            "LED_OFF"
-        );
+        EnviarComando("LED_OFF");
     }
 
     // =====================================================
-    // ENVIAR COMANDO
+    // ENVIAR COMANDO TCP
     // =====================================================
 
-    async void EnviarComando(
-        string comando
-    )
+    public async void EnviarComando(string comando)
     {
-        if (
-            !conectado ||
-            cliente == null ||
-            !cliente.Connected ||
-            stream == null
-        )
-        {
-            Debug.LogWarning(
-                "ESP32 não está conectado."
-            );
-
+        if (!ativo)
             return;
-        }
+
+        await travaEnvio.WaitAsync();
 
         try
         {
-            byte[] dados =
-                Encoding.UTF8.GetBytes(
-                    comando + "\n"
+            if (
+                !conectado ||
+                cliente == null ||
+                !cliente.Connected ||
+                stream == null
+            )
+            {
+                Debug.LogWarning(
+                    "ESP32 não está conectado. Comando não enviado: "
+                    + comando
                 );
+
+                return;
+            }
+
+            byte[] dados = Encoding.UTF8.GetBytes(
+                comando + "\n"
+            );
 
             await stream.WriteAsync(
                 dados,
@@ -688,21 +627,19 @@ public class ESP32Controller : MonoBehaviour
                 dados.Length
             );
 
-            Debug.Log(
-                "Comando enviado: " +
-                comando
-            );
+            Debug.Log("Comando enviado: " + comando);
         }
-        catch (
-            System.Exception erro
-        )
+        catch (Exception erro)
         {
             Debug.LogWarning(
-                "Erro ao enviar comando: " +
-                erro.Message
+                "Erro ao enviar comando: " + erro.Message
             );
 
             Desconectar();
+        }
+        finally
+        {
+            travaEnvio.Release();
         }
     }
 
@@ -710,7 +647,7 @@ public class ESP32Controller : MonoBehaviour
     // DESCONECTAR
     // =====================================================
 
-    void Desconectar()
+    private void Desconectar()
     {
         conectado = false;
 
@@ -722,6 +659,7 @@ public class ESP32Controller : MonoBehaviour
             }
             catch
             {
+                // Ignora erros ao fechar o fluxo.
             }
 
             stream = null;
@@ -735,22 +673,22 @@ public class ESP32Controller : MonoBehaviour
             }
             catch
             {
+                // Ignora erros ao fechar o cliente.
             }
 
             cliente = null;
         }
 
-        Debug.Log(
-            "Conexão com ESP32 encerrada."
-        );
+        Debug.Log("Conexão com ESP32 encerrada.");
     }
 
     // =====================================================
-    // DESTROY
+    // ENCERRAMENTO
     // =====================================================
 
-    void OnDestroy()
+    private void OnDestroy()
     {
+        ativo = false;
         Desconectar();
     }
 }

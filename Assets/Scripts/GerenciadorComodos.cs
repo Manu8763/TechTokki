@@ -1,3 +1,4 @@
+
 using UnityEngine;
 using TMPro;
 using UnityEngine.UI;
@@ -35,7 +36,34 @@ public class GerenciadorComodos : MonoBehaviour
 
     private int comodoAtual = 0;
 
-    void Awake()
+    // Número enviado ao ESP32: de 1 a 4.
+    public int NumeroComodoAtual
+    {
+        get { return comodoAtual + 1; }
+    }
+
+    // Intensidade do cômodo selecionado.
+    public float IntensidadeAtual
+    {
+        get
+        {
+            if (
+                comodos == null ||
+                comodoAtual < 0 ||
+                comodoAtual >= comodos.Length ||
+                comodos[comodoAtual] == null
+            )
+                return 1f;
+
+            return comodos[comodoAtual].intensidade;
+        }
+    }
+
+    // =====================================================
+    // INICIALIZAÇÃO
+    // =====================================================
+
+    private void Awake()
     {
         if (Instance == null)
         {
@@ -47,32 +75,71 @@ public class GerenciadorComodos : MonoBehaviour
         }
     }
 
-    void Start()
+    private void Start()
     {
+        if (comodos == null || comodos.Length == 0)
+        {
+            Debug.LogError(
+                "GerenciadorComodos: nenhum cômodo foi configurado."
+            );
+            return;
+        }
+
+        if (selecionarComodo == null)
+        {
+            Debug.LogError(
+                "GerenciadorComodos: o Dropdown não foi atribuído."
+            );
+            return;
+        }
+
         ConfigurarDropdown();
 
         selecionarComodo.onValueChanged.AddListener(MudarComodo);
 
-        // Detecta alterações feitas pela interface
-        luzToggle.onValueChanged.AddListener(SalvarLuz);
-        intensidadeSlider.onValueChanged.AddListener(SalvarIntensidade);
-        programacaoToggle.onValueChanged.AddListener(SalvarProgramacao);
-        movimentoToggle.onValueChanged.AddListener(SalvarMovimento);
-        luminosidadeToggle.onValueChanged.AddListener(SalvarLuminosidade);
+        if (luzToggle != null)
+            luzToggle.onValueChanged.AddListener(SalvarLuz);
 
-        acenderInput.onEndEdit.AddListener(SalvarHorarioAcender);
-        apagarInput.onEndEdit.AddListener(SalvarHorarioApagar);
+        if (intensidadeSlider != null)
+            intensidadeSlider.onValueChanged.AddListener(SalvarIntensidade);
 
-        // Carrega o primeiro cômodo
+        if (programacaoToggle != null)
+            programacaoToggle.onValueChanged.AddListener(SalvarProgramacao);
+
+        if (movimentoToggle != null)
+            movimentoToggle.onValueChanged.AddListener(SalvarMovimento);
+
+        if (luminosidadeToggle != null)
+            luminosidadeToggle.onValueChanged.AddListener(SalvarLuminosidade);
+
+        if (acenderInput != null)
+            acenderInput.onEndEdit.AddListener(SalvarHorarioAcender);
+
+        if (apagarInput != null)
+            apagarInput.onEndEdit.AddListener(SalvarHorarioApagar);
+
+        // Carrega o primeiro cômodo.
         MudarComodo(0);
     }
 
-    void ConfigurarDropdown()
+    // =====================================================
+    // CONFIGURAR DROPDOWN
+    // =====================================================
+
+    private void ConfigurarDropdown()
     {
         selecionarComodo.ClearOptions();
 
         foreach (DadosComodo comodo in comodos)
         {
+            if (comodo == null)
+            {
+                Debug.LogError(
+                    "Existe um elemento vazio no array de cômodos."
+                );
+                continue;
+            }
+
             selecionarComodo.options.Add(
                 new TMP_Dropdown.OptionData(comodo.nome)
             );
@@ -81,87 +148,242 @@ public class GerenciadorComodos : MonoBehaviour
         selecionarComodo.RefreshShownValue();
     }
 
-    void MudarComodo(int indice)
+    // =====================================================
+    // MUDAR CÔMODO
+    // =====================================================
+
+    private void MudarComodo(int indice)
     {
+        if (
+            comodos == null ||
+            indice < 0 ||
+            indice >= comodos.Length
+        )
+        {
+            Debug.LogWarning("Índice de cômodo inválido.");
+            return;
+        }
+
+        if (comodos[indice] == null)
+        {
+            Debug.LogWarning(
+                "O cômodo selecionado não foi configurado."
+            );
+            return;
+        }
+
         comodoAtual = indice;
 
         CarregarDadosComodo();
     }
 
-    void CarregarDadosComodo()
+    // =====================================================
+    // CARREGAR DADOS DO CÔMODO
+    // =====================================================
+
+    private void CarregarDadosComodo()
     {
         DadosComodo dados = comodos[comodoAtual];
 
-        luzToggle.SetIsOnWithoutNotify(dados.luzLigada);
+        // Estado da lâmpada.
+        if (luzToggle != null)
+            luzToggle.SetIsOnWithoutNotify(dados.luzLigada);
+
         if (switchLuz != null)
             switchLuz.UpdateSwitch(dados.luzLigada);
 
-        intensidadeSlider.SetValueWithoutNotify(dados.intensidade);
+        // Intensidade.
+        if (intensidadeSlider != null)
+        {
+            intensidadeSlider.SetValueWithoutNotify(
+                dados.intensidade
+            );
+        }
 
+        // Cor e intensidade do ColorPicker.
         if (colorPicker != null)
+        {
             colorPicker.CarregarCor(dados.cor);
+            colorPicker.CarregarIntensidade(dados.intensidade);
+        }
 
-        programacaoToggle.SetIsOnWithoutNotify(dados.programacaoAtiva);
+        // Programação.
+        if (programacaoToggle != null)
+        {
+            programacaoToggle.SetIsOnWithoutNotify(
+                dados.programacaoAtiva
+            );
+        }
+
         if (switchProgramacao != null)
-            switchProgramacao.UpdateSwitch(dados.programacaoAtiva);
+        {
+            switchProgramacao.UpdateSwitch(
+                dados.programacaoAtiva
+            );
+        }
 
-        acenderInput.SetTextWithoutNotify(dados.horarioAcender);
-        apagarInput.SetTextWithoutNotify(dados.horarioApagar);
+        if (acenderInput != null)
+        {
+            acenderInput.SetTextWithoutNotify(
+                dados.horarioAcender
+            );
+        }
 
-        movimentoToggle.SetIsOnWithoutNotify(dados.sensorMovimento);
+        if (apagarInput != null)
+        {
+            apagarInput.SetTextWithoutNotify(
+                dados.horarioApagar
+            );
+        }
+
+        // Sensor de movimento.
+        if (movimentoToggle != null)
+        {
+            movimentoToggle.SetIsOnWithoutNotify(
+                dados.sensorMovimento
+            );
+        }
+
         if (switchMovimento != null)
-            switchMovimento.UpdateSwitch(dados.sensorMovimento);
+        {
+            switchMovimento.UpdateSwitch(
+                dados.sensorMovimento
+            );
+        }
 
-        luminosidadeToggle.SetIsOnWithoutNotify(dados.sensorLuminosidade);
+        // Sensor de luminosidade.
+        if (luminosidadeToggle != null)
+        {
+            luminosidadeToggle.SetIsOnWithoutNotify(
+                dados.sensorLuminosidade
+            );
+        }
+
         if (switchLuminosidade != null)
-            switchLuminosidade.UpdateSwitch(dados.sensorLuminosidade);
+        {
+            switchLuminosidade.UpdateSwitch(
+                dados.sensorLuminosidade
+            );
+        }
     }
 
-    // =========================
+    // =====================================================
     // SALVAR ALTERAÇÕES
-    // =========================
+    // =====================================================
 
-    void SalvarLuz(bool valor)
+    private void SalvarLuz(bool valor)
     {
+        if (!ComodoAtualValido())
+            return;
+
         comodos[comodoAtual].luzLigada = valor;
     }
 
-    void SalvarIntensidade(float valor)
+    private void SalvarIntensidade(float valor)
     {
-        comodos[comodoAtual].intensidade = Mathf.RoundToInt(valor);
+        if (!ComodoAtualValido())
+            return;
+
+        comodos[comodoAtual].intensidade =
+            Mathf.Clamp01(valor);
     }
 
-    void SalvarProgramacao(bool valor)
+    private void SalvarProgramacao(bool valor)
     {
+        if (!ComodoAtualValido())
+            return;
+
         comodos[comodoAtual].programacaoAtiva = valor;
     }
 
-    void SalvarHorarioAcender(string valor)
+    private void SalvarHorarioAcender(string valor)
     {
+        if (!ComodoAtualValido())
+            return;
+
         comodos[comodoAtual].horarioAcender = valor;
     }
 
-    void SalvarHorarioApagar(string valor)
+    private void SalvarHorarioApagar(string valor)
     {
+        if (!ComodoAtualValido())
+            return;
+
         comodos[comodoAtual].horarioApagar = valor;
     }
 
-    void SalvarMovimento(bool valor)
+    private void SalvarMovimento(bool valor)
     {
+        if (!ComodoAtualValido())
+            return;
+
         comodos[comodoAtual].sensorMovimento = valor;
     }
 
-    void SalvarLuminosidade(bool valor)
+    private void SalvarLuminosidade(bool valor)
     {
+        if (!ComodoAtualValido())
+            return;
+
         comodos[comodoAtual].sensorLuminosidade = valor;
     }
 
-    // =========================
-    // COR
-    // =========================
+    // =====================================================
+    // SALVAR COR
+    // =====================================================
 
     public void SalvarCor(Color novaCor)
     {
+        if (!ComodoAtualValido())
+            return;
+
         comodos[comodoAtual].cor = novaCor;
+    }
+
+    // =====================================================
+    // VALIDAR CÔMODO ATUAL
+    // =====================================================
+
+    private bool ComodoAtualValido()
+    {
+        return
+            comodos != null &&
+            comodoAtual >= 0 &&
+            comodoAtual < comodos.Length &&
+            comodos[comodoAtual] != null;
+    }
+
+    // =====================================================
+    // LIMPAR EVENTOS
+    // =====================================================
+
+    private void OnDestroy()
+    {
+        if (selecionarComodo != null)
+            selecionarComodo.onValueChanged.RemoveListener(MudarComodo);
+
+        if (luzToggle != null)
+            luzToggle.onValueChanged.RemoveListener(SalvarLuz);
+
+        if (intensidadeSlider != null)
+            intensidadeSlider.onValueChanged.RemoveListener(SalvarIntensidade);
+
+        if (programacaoToggle != null)
+            programacaoToggle.onValueChanged.RemoveListener(SalvarProgramacao);
+
+        if (movimentoToggle != null)
+            movimentoToggle.onValueChanged.RemoveListener(SalvarMovimento);
+
+        if (luminosidadeToggle != null)
+            luminosidadeToggle.onValueChanged.RemoveListener(SalvarLuminosidade);
+
+        if (acenderInput != null)
+            acenderInput.onEndEdit.RemoveListener(SalvarHorarioAcender);
+
+        if (apagarInput != null)
+            apagarInput.onEndEdit.RemoveListener(SalvarHorarioApagar);
+
+        if (Instance == this)
+            Instance = null;
     }
 }
