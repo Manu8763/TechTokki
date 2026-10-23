@@ -8,9 +8,19 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 
 public class ESP32Controller : MonoBehaviour
 {
+    // Mensagens recebidas do ESP32
+    private readonly ConcurrentQueue<string> mensagensRecebidas =
+        new ConcurrentQueue<string>();
+    // Interface do alerta de gás
+    [Header("Alerta de gás")]
+    public GameObject painelAlertaGas;
+    public AudioSource somAlertaGas;
+    public bool GasDetectado { get; private set; } = false;
+
     // =====================================================
     // CONFIGURAÇÃO
     // =====================================================
@@ -401,6 +411,9 @@ public class ESP32Controller : MonoBehaviour
             // A propriedade do cliente passa para a classe.
             novoCliente = null;
 
+            // Começa a receber mensagens do ESP32.
+            IniciarRecepcao(stream);
+
             Debug.Log("=================================");
             Debug.Log("ESP32 CONECTADO COM SUCESSO!");
             Debug.Log("IP: " + enderecoESP32);
@@ -605,6 +618,142 @@ public class ESP32Controller : MonoBehaviour
         }
     }
 
+    // =====================================================
+// RECEBER MENSAGENS DO ESP32
+// =====================================================
+
+private void IniciarRecepcao(NetworkStream fluxo)
+{
+    _ = ReceberMensagens(fluxo);
+}
+
+private async Task ReceberMensagens(NetworkStream fluxo)
+{
+    byte[] buffer = new byte[256];
+    StringBuilder mensagemParcial = new StringBuilder();
+
+    try
+    {
+        while (ativo && fluxo == stream)
+        {
+            int quantidade = await fluxo.ReadAsync(
+                buffer, 0, buffer.Length
+            );
+
+            if (quantidade == 0)
+                break;
+
+            string texto = Encoding.UTF8.GetString(
+                buffer, 0, quantidade
+            );
+
+            mensagemParcial.Append(texto);
+
+            string conteudo = mensagemParcial.ToString();
+            string[] linhas = conteudo.Split('\n');
+
+            // A última parte pode estar incompleta.
+            mensagemParcial.Clear();
+            mensagemParcial.Append(linhas[linhas.Length - 1]);
+
+            for (int i = 0; i < linhas.Length - 1; i++)
+            {
+                string mensagem = linhas[i].Trim();
+
+                if (!string.IsNullOrEmpty(mensagem))
+                {
+                    mensagensRecebidas.Enqueue(mensagem);
+                }
+            }
+        }
+    }
+    catch (Exception erro)
+    {
+        if (ativo && fluxo == stream)
+        {
+            Debug.LogWarning(
+                "Erro ao receber mensagem do ESP32: "
+                + erro.Message
+            );
+        }
+    }
+    finally
+    {
+        // A desconexão será processada na thread principal da Unity.
+        if (ativo && fluxo == stream)
+        {
+            mensagensRecebidas.Enqueue("__CONEXAO_PERDIDA__");
+        }
+    }
+}
+// =====================================================
+// PROCESSAR MENSAGENS RECEBIDAS
+// =====================================================
+
+private void Update()
+{
+    while (mensagensRecebidas.TryDequeue(out string mensagem))
+    {
+        Debug.Log("Mensagem recebida do ESP32: " + mensagem);
+
+        switch (mensagem)
+        {
+            case "GAS_ON":
+                AtualizarAlertaGas(true);
+                break;
+
+            case "GAS_OFF":
+                AtualizarAlertaGas(false);
+                break;
+
+            case "__CONEXAO_PERDIDA__":
+                Desconectar();
+                break;
+        }
+    }
+}
+
+// =====================================================
+// ATUALIZAR ALERTA DE GÁS
+// =====================================================
+
+private void AtualizarAlertaGas(bool detectado)
+{
+    GasDetectado = detectado;
+
+    // Controla o som primeiro.
+    if (somAlertaGas != null)
+    {
+        if (detectado)
+        {
+            somAlertaGas.loop = true;
+
+            if (!somAlertaGas.isPlaying)
+            {
+                somAlertaGas.Play();
+            }
+        }
+        else
+        {
+            somAlertaGas.Stop();
+        }
+    }
+
+    // Depois, mostra ou esconde o painel.
+    if (painelAlertaGas != null)
+    {
+        painelAlertaGas.SetActive(detectado);
+    }
+
+    if (detectado)
+    {
+        Debug.LogWarning("ALERTA: GÁS DETECTADO!");
+    }
+    else
+    {
+        Debug.Log("Alerta de gás encerrado.");
+    }
+}
 
     // =====================================================
     // ENVIAR COMANDO TCP
@@ -674,40 +823,52 @@ public async void EnviarComando(string comando)
     // =====================================================
 
     private void Desconectar()
+{
+    conectado = false;
+
+    if (stream != null)
     {
-        conectado = false;
-
-        if (stream != null)
+        try
         {
-            try
-            {
-                stream.Close();
-            }
-            catch
-            {
-                // Ignora erros ao fechar o fluxo.
-            }
-
-            stream = null;
+            stream.Close();
+        }
+        catch
+        {
+            // Ignora erros ao fechar o fluxo.
         }
 
-        if (cliente != null)
-        {
-            try
-            {
-                cliente.Close();
-            }
-            catch
-            {
-                // Ignora erros ao fechar o cliente.
-            }
-
-            cliente = null;
-        }
-
-        Debug.Log("Conexão com ESP32 encerrada.");
+        stream = null;
     }
 
+    if (cliente != null)
+    {
+        try
+        {
+            cliente.Close();
+        }
+        catch
+        {
+            // Ignora erros ao fechar o cliente.
+        }
+
+        cliente = null;
+    }
+
+    // Encerra o alerta se a conexão for perdida.
+    GasDetectado = false;
+
+    if (somAlertaGas != null && somAlertaGas.isPlaying)
+    {
+        somAlertaGas.Stop();
+    }
+
+    if (painelAlertaGas != null)
+    {
+        painelAlertaGas.SetActive(false);
+    }
+
+    Debug.Log("Conexão com ESP32 encerrada.");
+}
     // =====================================================
     // ENCERRAMENTO
     // =====================================================
