@@ -7,26 +7,30 @@ public class SliderScript : MonoBehaviour
     [SerializeField] private Slider _slider;
     [SerializeField] private TextMeshProUGUI _sliderText;
 
-    [Header("Color Picker")]
-    public ColorPicker colorPicker;
-
     void Start()
     {
-        if (_slider.value <= 0)
-            _slider.value = 100;
+        if (_slider == null)
+            _slider = GetComponent<Slider>();
 
-        _slider.onValueChanged.AddListener(UpdateSliderText);
+        if (_slider != null)
+        {
+            _slider.onValueChanged.AddListener(UpdateSliderText);
 
-        UpdateSliderText(_slider.value);
+            UpdateSliderText(_slider.value);
+        }
     }
 
     public void UpdateSliderText(float value)
     {
-        _sliderText.text = Mathf.RoundToInt(value) + "%";
-
-        if (colorPicker != null)
+        if (_sliderText != null)
         {
-            colorPicker.SetIntensidade(value / 100f);
+            _sliderText.text = Mathf.RoundToInt(value) + "%";
         }
+    }
+
+    void OnDestroy()
+    {
+        if (_slider != null)
+            _slider.onValueChanged.RemoveListener(UpdateSliderText);
     }
 }

@@ -195,11 +195,31 @@ public class GerenciadorComodos : MonoBehaviour
         if (switchLuz != null)
             switchLuz.UpdateSwitch(dados.luzLigada);
 
-        // Intensidade.
+        // Intensidade
         if (intensidadeSlider != null)
         {
+            // Atualiza o valor e a posição visual do Slider.
             intensidadeSlider.SetValueWithoutNotify(
                 dados.intensidade
+            );
+
+            // Atualiza o texto da porcentagem.
+            SliderScript sliderScript =
+                intensidadeSlider.GetComponent<SliderScript>();
+
+            if (sliderScript != null)
+            {
+                sliderScript.UpdateSliderText(dados.intensidade);
+            }
+        }
+
+        // Cor e intensidade do ColorPicker.
+        if (colorPicker != null)
+        {
+            colorPicker.CarregarCor(dados.cor);
+
+            colorPicker.CarregarIntensidade(
+                dados.intensidade / 100f
             );
         }
 
@@ -207,7 +227,7 @@ public class GerenciadorComodos : MonoBehaviour
         if (colorPicker != null)
         {
             colorPicker.CarregarCor(dados.cor);
-            colorPicker.CarregarIntensidade(dados.intensidade);
+            colorPicker.CarregarIntensidade(dados.intensidade / 100f);
         }
 
         // Programação.
@@ -287,8 +307,11 @@ public class GerenciadorComodos : MonoBehaviour
         if (!ComodoAtualValido())
             return;
 
-        comodos[comodoAtual].intensidade =
-            Mathf.Clamp01(valor);
+        comodos[comodoAtual].intensidade = Mathf.Clamp(valor, 0f, 100f);
+        if (colorPicker != null)
+        {
+            colorPicker.SetIntensidade(valor / 100f);
+        }
     }
 
     private void SalvarProgramacao(bool valor)
